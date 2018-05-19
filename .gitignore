@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+rebelengine.so
+rebelengine.dylib
+rebelengine.dll
+rebelengine.a
+rebelengine.lib
+rebelengine-test-*
+*.exe
+*.o
+*.obj
+*.lst
+.gdb_history
+dub.selections.json
+/bin
