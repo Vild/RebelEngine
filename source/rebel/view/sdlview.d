@@ -2,7 +2,6 @@ module rebel.view.sdlview;
 
 import rebel.view;
 import rebel.renderer;
-import rebel.renderer.vkrenderer : IVulkanRenderer, IVulkanView;
 
 import derelict.sdl2.sdl;
 
@@ -26,7 +25,7 @@ void sdlAssert(T, Args...)(T cond, Args args) {
 	assert(0);
 }
 
-final class SDLView : IView, IVulkanView {
+final class SDLView : IView, IVulkanView, IOpenGLView {
 public:
 	this(string title, ivec2 size) {
 		_title = title;
@@ -40,21 +39,44 @@ public:
 		sdlAssert(!SDL_Init(SDL_INIT_EVERYTHING), "SDL could not initialize!");
 		//sdlAssert(IMG_Init(IMG_INIT_PNG), "SDL_image could not initialize!");
 
-		SDL_WindowFlags windowFlags = SDL_WINDOW_SHOWN;
+		SDL_WindowFlags windowFlags = SDL_WindowFlags.SDL_WINDOW_SHOWN;
 
 		_rendererType = renderer.renderType;
 		if (_rendererType == RendererType.vulkan) {
 			sdlAssert(!SDL_Vulkan_LoadLibrary(null), "Vulkan failed to load");
-			windowFlags |= SDL_WINDOW_VULKAN;
+			windowFlags |= SDL_WindowFlags.SDL_WINDOW_VULKAN;
+		} else if (_rendererType == RendererType.opengl) {
+			windowFlags |= SDL_WindowFlags.SDL_WINDOW_OPENGL;
+
+			auto glRenderer = cast(IOpenGLRenderer)renderer;
+			int flags = SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG;
+			debug flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
+
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, flags);
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+			SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+			SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+			SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+
+			auto glVersion = glRenderer.glVersion;
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, glVersion.x);
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, glVersion.y);
 		}
 
 		sdlAssert(_window = SDL_CreateWindow(_title.toStringz, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, _size.x,
 				_size.y, windowFlags), "Failed to create window");
+
+		if (_rendererType == RendererType.opengl) {
+			_glContext = SDL_GL_CreateContext(_window);
+			vsync = true;
+		}
 	}
 
 	~this() {
 		if (_rendererType == RendererType.vulkan)
 			SDL_Vulkan_UnloadLibrary();
+		else if (_rendererType == RendererType.opengl)
+			SDL_GL_DeleteContext(_glContext);
 
 		//IMG_Quit();
 		SDL_Quit();
@@ -107,13 +129,24 @@ public:
 		return _size;
 	}
 
+	@property bool vsync() const {
+		return _vsync;
+	}
+
+	@property void vsync(bool enabled) {
+		SDL_GL_SetSwapInterval(enabled);
+		_vsync = enabled;
+	}
+
 private:
 	string _title;
 	ivec2 _size;
 	bool _quit;
+	bool _vsync;
 
 	IRenderer _renderer;
 	RendererType _rendererType;
 
 	SDL_Window* _window;
+	SDL_GLContext _glContext;
 }

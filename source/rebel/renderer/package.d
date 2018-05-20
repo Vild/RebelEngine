@@ -2,9 +2,13 @@ module rebel.renderer;
 
 import rebel.view;
 
+public import rebel.renderer.vkrenderer : IVulkanRenderer, IVulkanView;
+public import rebel.renderer.glrenderer : IOpenGLRenderer, IOpenGLView;
+
 enum RendererType {
 	null_,
-	vulkan
+	vulkan,
+	opengl
 }
 
 interface ISubpassAttachmentBuilder {
@@ -40,7 +44,7 @@ interface IPipelineBuilder {
 interface IRenderer {
 	void initialize(IView view);
 
-	// IPipeline newPipeline();
+	// IPipelineBuilder newPipeline();
 
 	@property RendererType renderType() const;
 }

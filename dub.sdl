@@ -7,8 +7,11 @@ license "MPLv2"
 targetPath "bin/"
 
 dependency "derelict-sdl2" version="~>3.1.0-alpha.4"
-// dependency "derelict-sdl2" path="../DerelictSDL2"
+dependency "derelict-imgui" version="~>0.10.0"
+
 dependency "erupted" version="~>2.0.2"
+dependency "opengl" version="~>1.0.0"
+
 dependency "imageformats" version="~>7.0.0"
 
 dependency "dlsl" version="~>0.1.2"
