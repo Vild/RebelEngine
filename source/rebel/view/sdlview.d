@@ -108,6 +108,7 @@ public:
 
 	void doEvents(ref Event[] events) {
 		import std.stdio;
+
 		immutable MouseButton[ubyte] translateMouseButton = [
 	SDL_BUTTON_LEFT : MouseButton.left, SDL_BUTTON_MIDDLE : MouseButton.middle, SDL_BUTTON_RIGHT : MouseButton.right,
 	SDL_BUTTON_X1 : MouseButton.x1, SDL_BUTTON_X2 : MouseButton.x2
@@ -197,6 +198,22 @@ public:
 		ms.buttons.middle = !!(mouseMask & SDL_BUTTON(SDL_BUTTON_MIDDLE));
 		ms.buttons.right = !!(mouseMask & SDL_BUTTON(SDL_BUTTON_RIGHT));
 		return ms;
+	}
+
+	@property void cursorVisibillity(bool visible) {
+		SDL_ShowCursor(visible);
+	}
+
+	@property string clipboard() {
+		import std.string : fromStringz;
+
+		return cast(string)SDL_GetClipboardText().fromStringz;
+	}
+
+	@property void clipboard(string data) {
+		import std.string : toStringz;
+
+		SDL_SetClipboardText(data.toStringz);
 	}
 
 private:

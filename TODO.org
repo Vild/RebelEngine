@@ -1,15 +1,15 @@
-- TODO [0/10]
+- TODO [1/10]
   - [-] Input
-	  - [-] Warp all events
-			- [ ] connect with SDLView
+	  - [X] Warp all events
+			- [X] connect with SDLView
 		  - [X] Mousewheel
 			- [X] Mousedown
 			- [X] Text input
 			- [X] keydown & keyup
 				- [X] Make own Keys enum
-		- [ ] get mouse status
+		- [X] get mouse status
 		- [ ] hide/show mouse
-	- [ ] View get size & get drawable size
+	- [X] View get size & get drawable size
 	- [ ] Save renderer state (1-level is enought)
 	- [ ] Implement shaders for opengl
 	- [ ] VAO, VBO, and elements

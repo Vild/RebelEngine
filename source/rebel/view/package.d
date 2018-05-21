@@ -25,6 +25,10 @@ interface IView {
 	@property ivec2 drawableSize();
 
 	@property MouseState mouseState();
+	@property void cursorVisibillity(bool visible);
+
+	@property string clipboard();
+	@property void clipboard(string data);
 }
 
 final class NullView : IView {
@@ -36,7 +40,8 @@ public:
 	void doEvents(ref Event[] events) {
 	}
 
-void finalizeFrame() {}
+	void finalizeFrame() {
+	}
 
 	@property bool quit() const {
 		return false;
@@ -52,5 +57,15 @@ void finalizeFrame() {}
 
 	@property MouseState mouseState() {
 		return MouseState(false);
+	}
+
+	@property void cursorVisibillity(bool visible) {
+	}
+
+	@property string clipboard() {
+		return "";
+	}
+
+	@property void clipboard(string data) {
 	}
 }

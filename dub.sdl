@@ -8,16 +8,21 @@ targetPath "bin/"
 
 lflags "-rpath=../DerelictImgui/cimgui/cimgui" platform="posix"
 
+
+# Rendering
 dependency "derelict-sdl2" version="~>3.1.0-alpha.4"
 //dependency "derelict-imgui" version="~>0.10.0"
 dependency "derelict-imgui" path="../DerelictImgui"
-
 dependency "erupted" version="~>2.0.2"
 dependency "opengl:gl4" version="~>1.0.0"
 
-dependency "imageformats" version="~>7.0.0"
+# I/O
+dependency "derelict-physfs" version="~>3.0.0-beta.2"
 
+# Type handlers
+dependency "imageformats" version="~>7.0.0"
 dependency "dlsl" version="~>0.1.2"
 dependency "sdlss" version="~>0.3.3"
 
+# Misc
 dependency "derelict_extras-discord-rpc" version="~>1.0.0"

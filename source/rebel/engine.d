@@ -3,9 +3,13 @@ module rebel.engine;
 import rebel.view;
 import rebel.renderer;
 
+import rebel.input.filesystem;
 import rebel.input.event;
 
+import rebel.ui;
 import rebel.ui.imgui;
+
+import core.time;
 
 interface IEngineState {
 	void enter(IEngineState oldState);
@@ -15,9 +19,19 @@ interface IEngineState {
 
 final class Engine {
 public:
-	 ~this() {
+	this() {
+		_instance = this;
+		_fileSystem = new FileSystem();
+	}
+
+	static Engine instance() {
+		return _instance;
+	}
+
+	~this() {
 		_renderer.destroy;
 		_view.destroy;
+		_instance = null;
 	}
 
 	void attach(IView view, IRenderer renderer) {
@@ -35,13 +49,18 @@ public:
 		_nextState = null;
 		_currentState.enter(null);
 
+		_oldTime = MonoTime.currTime;
 		while (_currentState && !_view.quit) {
+			MonoTime curTime = MonoTime.currTime;
+			const float delta = (curTime - _oldTime).total!"usecs" / 1_000_000.0f; //1 000 000 µsec/ 1 sec
+			_oldTime = curTime;
+
 			_view.doEvents(_events);
 			_ui.processEvents(_events);
 			_renderer.newFrame();
-			_ui.newFrame();
+			_ui.newFrame(delta);
 
-			_currentState.update(1 / 60.0f);
+			_currentState.update(delta);
 
 			_ui.endRender();
 			_renderer.finalize();
@@ -70,6 +89,10 @@ public:
 		_events ~= event;
 	}
 
+	@property FileSystem fileSystem() {
+		return _fileSystem;
+	}
+
 	@property IView view() {
 		return _view;
 	}
@@ -91,6 +114,10 @@ public:
 	}
 
 private:
+	static Engine _instance;
+	MonoTime _oldTime;
+	FileSystem _fileSystem;
+
 	IView _view;
 	IRenderer _renderer;
 
@@ -99,5 +126,5 @@ private:
 
 	Event[] _events;
 
-	ImguiUI _ui;
+	IUIRenderer _ui;
 }

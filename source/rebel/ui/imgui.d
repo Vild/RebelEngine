@@ -23,7 +23,8 @@ public:
 		_view = view;
 
 		ImGuiIO* io = igGetIO();
-		io.KeyMap[ImGuiKey_Tab] = cast(uint)Key.tab; // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
+		// Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
+		io.KeyMap[ImGuiKey_Tab] = cast(uint)Key.tab;
 		io.KeyMap[ImGuiKey_LeftArrow] = cast(uint)Key.left;
 		io.KeyMap[ImGuiKey_RightArrow] = cast(uint)Key.right;
 		io.KeyMap[ImGuiKey_UpArrow] = cast(uint)Key.up;
@@ -48,24 +49,26 @@ public:
 		io.GetClipboardTextFn = &_getClipboardText;
 		io.ClipboardUserData = null;
 
+		/+
+		// TODO: Implement this?
 		version (Win32) {
 			SDL_SysWMinfo wmInfo;
 			SDL_VERSION(&wmInfo.version_);
 			SDL_GetWindowWMInfo(window, &wmInfo);
 			io.ImeWindowHandle = wmInfo.info.win.window;
-		}
+		}+/
 
 		igStyleColorsDark(igGetStyle());
 	}
 
 	~this() {
-		invalidateDeviceObjects();
+		resetRenderer();
 		igShutdown();
 	}
 
-	void newFrame() {
+	void newFrame(float delta) {
 		if (!g_FontTexture)
-			createDeviceObjects();
+			_createDeviceObjects();
 
 		ImGuiIO* io = igGetIO();
 
@@ -78,21 +81,16 @@ public:
 				? (cast(float)displaySize.y / size.y) : 0);
 
 		// Setup time step
-		Uint32 time = SDL_GetTicks();
-		double current_time = time / 1000.0;
-		io.DeltaTime = g_Time > 0.0 ? cast(float)(current_time - g_Time) : cast(float)(1.0f / 60.0f);
-		g_Time = current_time;
-
-		// Setup inputs
-		// (we already got mouse wheel, keyboard keys & characters from SDL_PollEvent())
+		io.DeltaTime = delta;
 
 		MouseState mouseState = _view.mouseState;
 		if (mouseState.isFocused)
-			io.MousePos = ImVec2(mouseState.position.x, mouseState.position.y); // Mouse position, in pixels (set to -1,-1 if no mouse / on another screen, etc.)
+			io.MousePos = ImVec2(mouseState.position.x, mouseState.position.y);
 		else
-			io.MousePos = ImVec2(-float.max, -float.max);
+			io.MousePos = ImVec2(-1, -1);
 
-		io.MouseDown[0] = g_MousePressed[0] || mouseState.buttons.left; // If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
+		// If a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame.
+		io.MouseDown[0] = g_MousePressed[0] || mouseState.buttons.left;
 		io.MouseDown[1] = g_MousePressed[1] || mouseState.buttons.right;
 		io.MouseDown[2] = g_MousePressed[2] || mouseState.buttons.middle;
 		g_MousePressed[0] = g_MousePressed[1] = g_MousePressed[2] = false;
@@ -101,7 +99,7 @@ public:
 		g_MouseWheel = 0.0f;
 
 		// Hide OS mouse cursor if ImGui is drawing it
-		// TODO: SDL_ShowCursor(io.MouseDrawCursor ? 0 : 1);
+		_view.cursorVisibillity = !io.MouseDrawCursor;
 
 		// Start the frame. This call will update the io.WantCaptureMouse, io.WantCaptureKeyboard flag that you can use to dispatch inputs (or not) to your application.
 		igNewFrame();
@@ -123,7 +121,7 @@ public:
 	// - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
 	// - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
 	// Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-	static void processEvents(Event[] events) {
+	void processEvents(Event[] events) {
 		//TODO: Add support to mark event as processed.
 
 		import std.variant : tryVisit;
@@ -155,7 +153,7 @@ public:
 			}, (ref TextInputEvent text) { ImGuiIO_AddInputCharactersUTF8(text.text[].dup.ptr); });
 	}
 
-	void invalidateDeviceObjects() {
+	void resetRenderer() {
 		if (g_VaoHandle)
 			glDeleteVertexArrays(1, &g_VaoHandle);
 		if (g_VboHandle)
@@ -187,55 +185,129 @@ public:
 		}
 	}
 
-	bool createDeviceObjects() {
+private:
+	static IView _view;
+	static bool _showDemoWindow = true;
+
+	// Data
+	static double g_Time = 0.0f;
+	static bool[3] g_MousePressed = [false, false, false];
+	static float g_MouseWheel = 0.0f;
+	static uint g_FontTexture;
+	static uint g_ShaderHandle, g_VertHandle, g_FragHandle;
+	static int g_AttribLocationTex, g_AttribLocationProjMtx;
+	static int g_AttribLocationPosition, g_AttribLocationUV, g_AttribLocationColor;
+	static uint g_VboHandle, g_VaoHandle, g_ElementsHandle;
+
+	bool _createDeviceObjects() {
+		import std.file : readText;
+
 		// Backup GL state
 		GLint last_texture, last_array_buffer, last_vertex_array;
 		glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
 		glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
 		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
 
-		const GLchar* vertex_shader = q{
-			#version 330
-			uniform mat4 ProjMtx;
-			in vec2 Position;
-			in vec2 UV;
-			in vec4 Color;
-			out vec2 Frag_UV;
-			out vec4 Frag_Color;
-			void main() {
-				Frag_UV = UV;
-				Frag_Color = Color;
-				gl_Position = ProjMtx * vec4(Position.xy,0,1);
-			}
-		};
+		import rebel.engine;
+		import rebel.input.filesystem;
 
-		const GLchar* fragment_shader = q{
-			#version 330
-			uniform sampler2D Texture;
-			in vec2 Frag_UV;
-			in vec4 Frag_Color;
-			out vec4 Out_Color;
-			void main() {
-				Out_Color = Frag_Color * texture( Texture, Frag_UV.st);
-			}
-		};
+		FileSystem fs = Engine.instance.fileSystem;
+
+		GLchar[] vertex_shader;
+		scope (exit)
+			vertex_shader.destroy;
+		GLchar[] fragment_shader;
+		scope (exit)
+			fragment_shader.destroy;
+
+		{
+			FSFile file = fs.open("imgui/base.vert", FileMode.read);
+			scope (exit)
+				file.destroy;
+			vertex_shader.length = file.length;
+			file.read(cast(ubyte[])vertex_shader);
+		}
+		{
+			FSFile file = fs.open("imgui/base.frag", FileMode.read);
+			scope (exit)
+				file.destroy;
+			fragment_shader.length = file.length;
+			file.read(cast(ubyte[])fragment_shader);
+		}
+
+		const GLchar* vertex_shader_ptr = &vertex_shader[0];
+		const GLchar* fragment_shader_ptr = &fragment_shader[0];
 
 		g_ShaderHandle = glCreateProgram();
 		g_VertHandle = glCreateShader(GL_VERTEX_SHADER);
 		g_FragHandle = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(g_VertHandle, 1, &vertex_shader, null);
-		glShaderSource(g_FragHandle, 1, &fragment_shader, null);
+		glShaderSource(g_VertHandle, 1, &vertex_shader_ptr, null);
+		glShaderSource(g_FragHandle, 1, &fragment_shader_ptr, null);
+
 		glCompileShader(g_VertHandle);
+
+		GLint status;
+		glGetShaderiv(g_VertHandle, GL_COMPILE_STATUS, &status);
+		if (status == GL_FALSE) {
+			import std.stdio : writefln;
+			import std.string : fromStringz;
+
+			GLuint len;
+			glGetShaderiv(g_VertHandle, GL_INFO_LOG_LENGTH, cast(GLint*)&len);
+
+			GLchar[] errorLog;
+			scope (exit)
+				errorLog.destroy;
+			errorLog.length = len;
+			glGetShaderInfoLog(g_VertHandle, len, &len, &errorLog[0]);
+
+			writefln("[error] Shader compilation failed %s (%u):\n%s", "<Vertex>", g_VertHandle, errorLog.ptr.fromStringz);
+		}
+
 		glCompileShader(g_FragHandle);
+		glGetShaderiv(g_FragHandle, GL_COMPILE_STATUS, &status);
+		if (status == GL_FALSE) {
+			import std.stdio : writefln;
+			import std.string : fromStringz;
+
+			GLuint len;
+			glGetShaderiv(g_FragHandle, GL_INFO_LOG_LENGTH, cast(GLint*)&len);
+
+			GLchar[] errorLog;
+			scope (exit)
+				errorLog.destroy;
+			errorLog.length = len;
+			glGetShaderInfoLog(g_FragHandle, len, &len, &errorLog[0]);
+
+			writefln("[error] Shader compilation failed %s (%u):\n%s", "<Fragment>", g_FragHandle, errorLog.ptr.fromStringz);
+		}
+
 		glAttachShader(g_ShaderHandle, g_VertHandle);
 		glAttachShader(g_ShaderHandle, g_FragHandle);
 		glLinkProgram(g_ShaderHandle);
 
-		g_AttribLocationTex = glGetUniformLocation(g_ShaderHandle, "Texture");
-		g_AttribLocationProjMtx = glGetUniformLocation(g_ShaderHandle, "ProjMtx");
-		g_AttribLocationPosition = glGetAttribLocation(g_ShaderHandle, "Position");
-		g_AttribLocationUV = glGetAttribLocation(g_ShaderHandle, "UV");
-		g_AttribLocationColor = glGetAttribLocation(g_ShaderHandle, "Color");
+		glGetProgramiv(g_ShaderHandle, GL_LINK_STATUS, &status);
+		if (status == GL_FALSE) {
+			import std.stdio : writefln;
+			import std.string : fromStringz;
+
+			GLuint len;
+			glGetProgramiv(g_ShaderHandle, GL_INFO_LOG_LENGTH, cast(GLint*)&len);
+
+			GLchar[] errorLog;
+			scope (exit)
+				errorLog.destroy;
+			errorLog.length = len;
+			glGetProgramInfoLog(g_ShaderHandle, len, &len, &errorLog[0]);
+
+			writefln("[error] Linking the program failed %u:\n%s", g_ShaderHandle, errorLog.ptr.fromStringz);
+		}
+
+		g_AttribLocationTex = glGetUniformLocation(g_ShaderHandle, "fontTexture");
+		g_AttribLocationProjMtx = glGetUniformLocation(g_ShaderHandle, "vp");
+		g_AttribLocationPosition = glGetAttribLocation(g_ShaderHandle, "position");
+		g_AttribLocationUV = glGetAttribLocation(g_ShaderHandle, "uv");
+		g_AttribLocationColor = glGetAttribLocation(g_ShaderHandle, "color");
 
 		glGenBuffers(1, &g_VboHandle);
 		glGenBuffers(1, &g_ElementsHandle);
@@ -260,20 +332,6 @@ public:
 
 		return true;
 	}
-
-private:
-	IView _view;
-	bool _showDemoWindow = true;
-
-	// Data
-	static double g_Time = 0.0f;
-	static bool[3] g_MousePressed = [false, false, false];
-	static float g_MouseWheel = 0.0f;
-	static uint g_FontTexture = 0;
-	static uint g_ShaderHandle = 0, g_VertHandle = 0, g_FragHandle = 0;
-	static int g_AttribLocationTex = 0, g_AttribLocationProjMtx = 0;
-	static int g_AttribLocationPosition = 0, g_AttribLocationUV = 0, g_AttribLocationColor = 0;
-	static uint g_VboHandle = 0, g_VaoHandle = 0, g_ElementsHandle = 0;
 
 	// This is the main rendering function that you have to implement and provide to ImGui (via setting up 'RenderDrawListsFn' in the ImGuiIO structure)
 	// Note that this implementation is little overcomplicated because we are saving/setting up/restoring every OpenGL state explicitly, in order to be able to run within any OpenGL engine that doesn't do so.
@@ -404,11 +462,21 @@ private:
 	}
 
 	extern (C) static const(char)* _getClipboardText(void*) nothrow {
-		return SDL_GetClipboardText();
+		import std.string : toStringz;
+
+		scope (failure)
+			return "";
+
+		return _view.clipboard.toStringz;
 	}
 
 	extern (C) static void _setClipboardText(void*, const(char)* text) nothrow {
-		SDL_SetClipboardText(text);
+		import std.string : fromStringz;
+
+		scope (failure)
+			return;
+
+		_view.clipboard = cast(string)text.fromStringz;
 	}
 
 	static void _createFontsTexture() {
