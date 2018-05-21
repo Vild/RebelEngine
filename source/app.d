@@ -26,9 +26,9 @@ class TestState : IEngineState {
 }
 
 int main(string[] args) {
-	//ISocialStatus d = DiscordSocialStatus.getInstance("447520822995845130");
-	//scope (exit)
-	//	d.destroy;
+	ISocialStatus d = DiscordSocialStatus.getInstance("447520822995845130");
+	scope (exit)
+		d.destroy;
 
 	{
 		import std.datetime;
@@ -39,10 +39,10 @@ int main(string[] args) {
 		update.state = "Loading...";
 		update.details = "Setting up renderer!";
 
-		update.largeImageKey = "icon-large";
-		update.largeImageText = "mp_rust";
-		update.smallImageKey = "icon-small";
-		update.smallImageText = "scout";
+		update.largeImageKey = "yelloweyes";
+		update.largeImageText = "Yellow Eyes monster";
+		update.smallImageKey = "powernex";
+		update.smallImageText = "PowerNex";
 
 		update.partyId = "DerpHerpDerp";
 		update.partySize = 1;
@@ -51,7 +51,7 @@ int main(string[] args) {
 		update.joinSecret = "MyJoinSecret";
 		update.spectateSecret = "MySpectateSecret";
 
-		//d.update(update);
+		d.update(update);
 	}
 
 	Engine e = new Engine;

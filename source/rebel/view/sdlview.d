@@ -2,6 +2,8 @@ module rebel.view.sdlview;
 
 import rebel.view;
 import rebel.renderer;
+import rebel.input.event;
+import rebel.input.key;
 
 import derelict.sdl2.sdl;
 
@@ -104,16 +106,49 @@ public:
 		return extensions;
 	}
 
-	void doEvents() {
+	void doEvents(ref Event[] events) {
+		import std.stdio;
+		immutable MouseButton[ubyte] translateMouseButton = [
+	SDL_BUTTON_LEFT : MouseButton.left, SDL_BUTTON_MIDDLE : MouseButton.middle, SDL_BUTTON_RIGHT : MouseButton.right,
+	SDL_BUTTON_X1 : MouseButton.x1, SDL_BUTTON_X2 : MouseButton.x2
+		];
+
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
 			case SDL_QUIT:
 				_quit = true;
 				break;
+			case SDL_MOUSEWHEEL:
+				events ~= MouseWheelEvent(event.wheel.x, event.wheel.y).Event;
+				break;
+			case SDL_MOUSEBUTTONUP:
+			case SDL_MOUSEBUTTONDOWN:
+				MouseButtonEvent mb;
+				mb.button = translateMouseButton[event.button.button];
+				mb.isDown = event.button.state == SDL_PRESSED;
+				mb.clicks = event.button.clicks;
+				mb.x = event.button.x;
+				mb.y = event.button.y;
+				events ~= mb.Event;
+				break;
+			case SDL_KEYUP:
 			case SDL_KEYDOWN:
-				if (event.key.keysym.sym == SDLK_ESCAPE)
+				if (event.key.keysym.sym == SDLK_ESCAPE) {
 					_quit = true;
+					break;
+				}
+
+				KeyEvent key;
+				key.key = event.key.keysym.scancode.translateKey;
+				key.modifiers = translateModifier(cast(SDL_Keymod)event.key.keysym.mod);
+				key.repeat = event.key.repeat;
+				key.isDown = event.key.state == SDL_PRESSED;
+				events ~= key.Event;
+
+				break;
+			case SDL_TEXTINPUT:
+				events ~= TextInputEvent(event.text.text).Event;
 				break;
 			default:
 				break;
@@ -121,12 +156,28 @@ public:
 		}
 	}
 
+	void finalizeFrame() {
+		if (_rendererType == RendererType.opengl)
+			SDL_GL_SwapWindow(_window);
+	}
+
 	@property bool quit() const {
 		return _quit;
 	}
 
-	@property ivec2 size() const {
-		return _size;
+	@property ivec2 size() {
+		int x, y;
+		SDL_GetWindowSize(_window, &x, &y);
+		return ivec2(x, y);
+	}
+
+	@property ivec2 drawableSize() {
+		int x, y;
+		if (_rendererType == RendererType.vulkan)
+			SDL_Vulkan_GetDrawableSize(_window, &x, &y);
+		else if (_rendererType == RendererType.opengl)
+			SDL_GL_GetDrawableSize(_window, &x, &y);
+		return ivec2(x, y);
 	}
 
 	@property bool vsync() const {
@@ -138,11 +189,21 @@ public:
 		_vsync = enabled;
 	}
 
+	@property MouseState mouseState() {
+		MouseState ms;
+		ms.isFocused = !!(SDL_GetWindowFlags(_window) & SDL_WINDOW_MOUSE_FOCUS);
+		const uint mouseMask = SDL_GetMouseState(&ms.position[0], &ms.position[1]);
+		ms.buttons.left = !!(mouseMask & SDL_BUTTON(SDL_BUTTON_LEFT));
+		ms.buttons.middle = !!(mouseMask & SDL_BUTTON(SDL_BUTTON_MIDDLE));
+		ms.buttons.right = !!(mouseMask & SDL_BUTTON(SDL_BUTTON_RIGHT));
+		return ms;
+	}
+
 private:
 	string _title;
-	ivec2 _size;
 	bool _quit;
 	bool _vsync;
+	ivec2 _size;
 
 	IRenderer _renderer;
 	RendererType _rendererType;

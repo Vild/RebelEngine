@@ -45,6 +45,8 @@ interface IRenderer {
 	void initialize(IView view);
 
 	// IPipelineBuilder newPipeline();
+	void newFrame();
+	void finalize();
 
 	@property RendererType renderType() const;
 }
@@ -54,6 +56,10 @@ public:
 	void initialize(IView view) {
 		assert(cast(NullView)view);
 	}
+
+
+	void newFrame() {}
+	void finalize() {}
 
 	@property RendererType renderType() const {
 		return RendererType.null_;

@@ -68,6 +68,12 @@ public:
 		vkDestroyInstance(_instance, null);
 	}
 
+	void newFrame() {
+	}
+
+	void finalize() {
+	}
+
 	@property RendererType renderType() const {
 		return RendererType.vulkan;
 	}

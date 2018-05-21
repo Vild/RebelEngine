@@ -10,25 +10,18 @@ struct MouseWheelEvent {
 }
 
 struct MouseButtonEvent {
-	enum Button {
-		left,
-		right,
-		center,
-		x1,
-		x2
-	}
-
-	Button button;
+	MouseButton button;
 	bool isDown;
-	ubyte clicked;
+	ubyte clicks;
 
 	int x, y;
 }
 
 struct KeyEvent {
+import rebel.input.key : Key;
 	Key key;
-	Modifier modifiers;
-	bool isRepeat;
+	ModifierState modifiers;
+	ubyte repeat;
 	bool isDown;
 }
 
