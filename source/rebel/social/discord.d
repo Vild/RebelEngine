@@ -11,7 +11,7 @@ shared static this() {
 	DerelictDiscordRPC.load();
 }
 
-class DiscordSocialStatus : ISocialStatus {
+class DiscordSocialStatus : ISocialService {
 public:
 	static DiscordSocialStatus getInstance(string appID) {
 		if (!_instance)

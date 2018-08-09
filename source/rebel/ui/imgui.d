@@ -13,8 +13,23 @@ import dlsl.vector;
 
 import opengl.gl4;
 
+public import imgui_extensions;
+
 shared static this() {
 	DerelictImgui.load();
+	/*
+	DerelictImgui.bindFunc(cast(void**)&igCreateDockContext, "igCreateDockContext");
+	DerelictImgui.bindFunc(cast(void**)&igDestroyDockContext, "igDestroyDockContext");
+	DerelictImgui.bindFunc(cast(void**)&igSetCurrentDockContext, "igSetCurrentDockContext");
+	DerelictImgui.bindFunc(cast(void**)&igGetCurrentDockContext, "igGetCurrentDockContext");
+	DerelictImgui.bindFunc(cast(void**)&igBeginDockspace, "igBeginDockspace");
+	DerelictImgui.bindFunc(cast(void**)&igEndDockspace, "igEndDockspace");
+	DerelictImgui.bindFunc(cast(void**)&igShutdownDock, "igShutdownDock");
+	DerelictImgui.bindFunc(cast(void**)&igSetNextDock, "igSetNextDock");
+	DerelictImgui.bindFunc(cast(void**)&igBeginDock, "igBeginDock");
+	DerelictImgui.bindFunc(cast(void**)&igEndDock, "igEndDock");
+	DerelictImgui.bindFunc(cast(void**)&igSetDockActive, "igSetDockActive");
+	DerelictImgui.bindFunc(cast(void**)&igDockDebugWindow, "igDockDebugWindow");*/
 }
 
 final class ImguiUI : IUIRenderer {
@@ -59,10 +74,13 @@ public:
 		}+/
 
 		igStyleColorsDark(igGetStyle());
+
+		igGetStyle().WindowPadding = ImVec2(8, 8);
 	}
 
 	~this() {
 		resetRenderer();
+
 		igShutdown();
 	}
 
@@ -104,13 +122,171 @@ public:
 		// Start the frame. This call will update the io.WantCaptureMouse, io.WantCaptureKeyboard flag that you can use to dispatch inputs (or not) to your application.
 		igNewFrame();
 
-		if (igButton("RUN imgui_demo (C++ version)"))
-			_showDemoWindow = !_showDemoWindow;
+		ImVec2 menuBarSize;
+		if (igBeginMainMenuBar()) {
+			if (igBeginMenu("File")) {
+				igMenuItem("New");
+				igMenuItem("Open");
+				igMenuItem("Save");
+				igMenuItem("Save As");
+				igSeparator();
+				igMenuItem("Quit");
+				igEndMenu();
+			}
+			if (igBeginMenu("Editor")) {
+				igEndMenu();
+			}
+			if (igBeginMenu("Help")) {
+				igEndMenu();
+			}
 
-		if (_showDemoWindow) {
-			igSetNextWindowPos(ImVec2(650, 20), ImGuiCond_FirstUseEver);
-			igShowDemoWindow(&_showDemoWindow);
+			igCheckbox("Show Demo Window", &_showDemoWindow);
+			//_showDemoWindow = !_showDemoWindow;
+
+			igGetWindowSize(&menuBarSize);
+			igEndMainMenuBar();
 		}
+
+		igSetNextWindowPos(ImVec2(0, menuBarSize.y));
+		auto fullscreenSize = igGetIO().DisplaySize;
+		fullscreenSize.y -= menuBarSize.y;
+		igSetNextWindowSize(fullscreenSize);
+		const ImGuiWindowFlags flags = (ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus
+				| ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
+		const bool visible = igBegin("Workspace", null, flags);
+
+		static float leftPanelSizeWidth = 150;
+		static float rightPanelSizeWidth = 150;
+		static float consolePanelSizeHeight = 150;
+
+		ImGuiStyle* style = igGetStyle();
+
+		float viewportSizeWidth = fullscreenSize.x - leftPanelSizeWidth - rightPanelSizeWidth - style.WindowPadding.x * 4;
+		if (viewportSizeWidth < 150)
+			viewportSizeWidth = 150;
+
+		float viewportSizeHeight = fullscreenSize.y - consolePanelSizeHeight - style.WindowPadding.y * 3.2;
+		if (viewportSizeHeight < 150)
+			viewportSizeHeight = 150;
+
+		if (visible) {
+			static size_t selected;
+			static string[] actions = ["Select", "Move", "Rotate", "Scale", "New entity", "New Light", "New Block", "Cut block", "Change Material"];
+			igDrawSplitter(false, style.WindowPadding.x, &leftPanelSizeWidth, &viewportSizeWidth, 150, 150);
+			{ // Left
+				igBeginChild("Left pane", ImVec2(leftPanelSizeWidth, 0), true);
+				foreach (i, action; actions) {
+					import std.format : format;
+					import std.string : toStringz;
+
+					ImVec4 color;
+					igGetStyleColorVec4(&color, ImGuiCol_Button);
+					if (selected == i) {
+						color.x *= 2;
+						color.y *= 2;
+						color.z *= 2;
+					}
+					igPushStyleColor(ImGuiCol_Button, color);
+					if (igButton(action.toStringz))
+						selected = i;
+					igPopStyleColor();
+				}
+				igEndChild();
+			}
+			igSameLine();
+			{
+				igBeginChild("Top-Bottom Split", ImVec2(0, 0), false);
+				igDrawSplitter(true, style.WindowPadding.y, &viewportSizeHeight, &consolePanelSizeHeight, 150, 150);
+
+				{
+					igBeginChild("Center-Right Split", ImVec2(0, viewportSizeHeight), false);
+					igDrawSplitter(false, style.WindowPadding.x, &viewportSizeWidth, &rightPanelSizeWidth, 150, 150);
+					{ // Center
+						igBeginChild("Center Pane", ImVec2(viewportSizeWidth, 0), true);
+						igBeginGroup();
+						igBeginChild("item view", ImVec2(0, -igGetFrameHeightWithSpacing())); // Leave room for 1 line below us
+						igText("MyObject: %zu", selected);
+						igSeparator();
+						igTextWrapped(
+								"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ");
+						igEndChild();
+						if (igButton("Revert")) {
+						}
+						igSameLine();
+						if (igButton("Save")) {
+						}
+						igEndGroup();
+						igEndChild();
+					}
+					igSameLine();
+
+					{ // right
+						igBeginChild("Right Pane", ImVec2(rightPanelSizeWidth, 0), true);
+						if (igCollapsingHeader("Position")) {
+							static float[3] pos = [0, 0, 0];
+							static float[3] scale = [1, 1, 1];
+							igDragFloat3("Position", pos);
+							igDragFloat3("Scale", scale);
+						}
+						if (igCollapsingHeader("Meh")) {
+							igButton("Small meh");
+							igButton("Big meh");
+						}
+						if (igCollapsingHeader("Material")) {
+							if (igTreeNode("Rocks")) {
+								for (int i = 0; i < 5; i++)
+									if (igTreeNodePtr(cast(void*)i, "Rock type: %d", i)) {
+										igText("This rock is fun :)");
+										igTreePop();
+									}
+								igTreePop();
+							}
+							if (igTreeNode("Special")) {
+								for (int i = 0; i < 5; i++)
+									if (igTreeNodePtr(cast(void*)i, "Special type: %d", i)) {
+										igText("MAGIC");
+										igTreePop();
+									}
+								igTreePop();
+							}
+						}
+						igEndChild();
+					}
+					igEndChild();
+				}
+				auto a = ImVec2(0, style.WindowPadding.y / 5.0f);
+				igDummy(&a);
+				{ // Console
+					igBeginChild("Console pane", ImVec2(0, consolePanelSizeHeight), true);
+					igText("DERP");
+					igEndChild();
+				}
+				igEndChild();
+			}
+
+			/*igBeginDockspace();
+
+			if (igBeginDock("World view", null, 0, ImVec2(0, 0), ImVec2(0, 0))) {
+				igButton("THIS IS THE WORLD", ImVec2(1280, 720));
+
+				igSetNextDock(ImGuiDockSlot.ImGuiDockSlot_Left);
+				if (igBeginDock("Toolbar", null, 0, ImVec2(0, 0), ImVec2(0, 0))) {
+					igButton("a");
+					igButton("b");
+					igButton("c");
+					igButton("d");
+				}
+				igEndDock();
+
+				igSetNextDock(ImGuiDockSlot.ImGuiDockSlot_Right);
+				if (igBeginDock("Settings", null, 0, ImVec2(0, 0), ImVec2(0, 0))) {
+
+				}
+			}*/
+		}
+		igEnd();
+		if (_showDemoWindow)
+			igShowDemoWindow(&_showDemoWindow);
 	}
 
 	void endRender() {
@@ -187,6 +363,7 @@ public:
 
 private:
 	static IView _view;
+
 	static bool _showDemoWindow = true;
 
 	// Data

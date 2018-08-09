@@ -1,6 +1,6 @@
 module rebel.social;
 
-interface ISocialStatus {
+interface ISocialService {
 	void update(ref SocialUpdate update);
 }
 

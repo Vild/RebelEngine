@@ -1,0 +1,8 @@
+name "imgui_extensions"
+targetType "library"
+targetPath "../../bin"
+
+importPaths "source"
+sourcePaths "source"
+
+dependency "derelict-imgui" path="../../3rdparty/DerelictImgui"

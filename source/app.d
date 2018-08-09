@@ -26,11 +26,7 @@ class TestState : IEngineState {
 }
 
 int main(string[] args) {
-	ISocialStatus d = DiscordSocialStatus.getInstance("447520822995845130");
-	scope (exit)
-		d.destroy;
-
-	{
+	/*{
 		import std.datetime;
 
 		SocialUpdate update;
@@ -52,15 +48,16 @@ int main(string[] args) {
 		update.spectateSecret = "MySpectateSecret";
 
 		d.update(update);
-	}
+	}*/
 
 	Engine e = new Engine;
 	scope (exit)
 		e.destroy;
 
-	//e.attach(new SDLView("My SDL2 Window", ivec2(1920, 1080)), new VKRenderer("My Test Game", Version(0, 1, 0)));
+	// e.attach(new SDLView("My SDL2 Window", ivec2(1920, 1080)), new VKRenderer("My Test Game", Version(0, 1, 0)));
 	e.attach(new SDLView("My SDL2 Window", ivec2(1920, 1080)), new GLRenderer("My Test Game", Version(0, 1, 0)));
 
+	// e.socialService ~= DiscordSocialStatus.getInstance("447520822995845130");
 	e.currentState = new TestState;
 
 	return e.mainLoop();

@@ -6,13 +6,14 @@ license "MPLv2"
 
 targetPath "bin/"
 
-lflags "-rpath=../DerelictImgui/cimgui/cimgui" platform="posix"
+lflags "-rpath=3rdparty/DerelictImgui/cimgui/cimgui" platform="posix"
 
+subPackage "lib/imgui_extensions"
+dependency ":imgui_extensions" version="*"
 
 # Rendering
 dependency "derelict-sdl2" version="~>3.1.0-alpha.4"
-//dependency "derelict-imgui" version="~>0.10.0"
-dependency "derelict-imgui" path="../DerelictImgui"
+dependency "derelict-imgui" path="3rdparty/DerelictImgui"
 dependency "erupted" version="~>2.0.2"
 dependency "opengl:gl4" version="~>1.0.0"
 

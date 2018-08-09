@@ -6,6 +6,8 @@ import rebel.renderer;
 import rebel.input.filesystem;
 import rebel.input.event;
 
+import rebel.social;
+
 import rebel.ui;
 import rebel.ui.imgui;
 
@@ -113,6 +115,14 @@ public:
 		return _events;
 	}
 
+	@property IUIRenderer ui() {
+		return _ui;
+	}
+
+	@property ref ISocialService[] socialService() {
+		return _socialService;
+	}
+
 private:
 	static Engine _instance;
 	MonoTime _oldTime;
@@ -127,4 +137,5 @@ private:
 	Event[] _events;
 
 	IUIRenderer _ui;
+	ISocialService[] _socialService;
 }
