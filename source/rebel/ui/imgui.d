@@ -1,5 +1,8 @@
 module rebel.ui.imgui;
 
+//TODO: add log system
+import std.stdio;
+
 import rebel.ui;
 import rebel.view;
 import rebel.renderer;
@@ -73,6 +76,42 @@ public:
 			io.ImeWindowHandle = wmInfo.info.win.window;
 		}+/
 
+		const float fontSize = 24;
+		{
+			import rebel.engine : Engine;
+			import rebel.input.filesystem : FSFile, FileMode;
+			import std.format : format;
+			import std.algorithm : min;
+
+			FSFile f = Engine.instance.fileSystem.open("imgui/DroidSans.ttf", FileMode.read);
+			scope (exit)
+				f.destroy;
+
+			ubyte[] data = (cast(ubyte*)igMemAlloc(f.length))[0 .. f.length];
+			f.read(data);
+
+			ImFontConfig cfg;
+
+			string genName = format("%s, %.0fpx", "DroidSans.ttf", fontSize);
+			cfg.Name[0 .. min(genName.length, cfg.Name.length)] = genName[0 .. min(genName.length, cfg.Name.length)];
+
+			ImFontAtlas_AddFontFromMemoryTTF(igGetIO().Fonts, data.ptr, cast(int)data.length, fontSize, &cfg, null);
+		}
+
+		{
+			import rebel.engine : Engine;
+			import rebel.input.filesystem : FSFile, FileMode;
+
+			FSFile f = Engine.instance.fileSystem.open("imgui/forkawesome-webfont.ttf", FileMode.read);
+			scope (exit)
+				f.destroy;
+
+			ubyte[] data = (cast(ubyte*)igMemAlloc(f.length))[0 .. f.length];
+
+			f.read(data);
+
+			initSymbolFont("FontAwesome", fontSize, data);
+		}
 		igStyleColorsDark(igGetStyle());
 
 		igGetStyle().WindowPadding = ImVec2(8, 8);
@@ -171,7 +210,9 @@ public:
 
 		if (visible) {
 			static size_t selected;
-			static string[] actions = ["Select", "Move", "Rotate", "Scale", "New entity", "New Light", "New Block", "Cut block", "Change Material"];
+			static string[] actions = [
+				"Select", "Move", "Rotate", "Scale", "New entity", "New Light", "New Block", "Cut block", "Change Material"
+			];
 			igDrawSplitter(false, style.WindowPadding.x, &leftPanelSizeWidth, &viewportSizeWidth, 150, 150);
 			{ // Left
 				igBeginChild("Left pane", ImVec2(leftPanelSizeWidth, 0), true);
@@ -201,25 +242,12 @@ public:
 				{
 					igBeginChild("Center-Right Split", ImVec2(0, viewportSizeHeight), false);
 					igDrawSplitter(false, style.WindowPadding.x, &viewportSizeWidth, &rightPanelSizeWidth, 150, 150);
-					{ // Center
-						igBeginChild("Center Pane", ImVec2(viewportSizeWidth, 0), true);
-						igBeginGroup();
-						igBeginChild("item view", ImVec2(0, -igGetFrameHeightWithSpacing())); // Leave room for 1 line below us
-						igText("MyObject: %zu", selected);
-						igSeparator();
-						igTextWrapped(
-								"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ");
-						igEndChild();
-						if (igButton("Revert")) {
-						}
-						igSameLine();
-						if (igButton("Save")) {
-						}
-						igEndGroup();
-						igEndChild();
+					if (_worldView) { // Center
+						ImVec2 drawAreaSize = ImVec2(viewportSizeWidth, viewportSizeHeight);
+						_worldView.drawAreaSize = ivec2(cast(int)drawAreaSize.x, cast(int)drawAreaSize.y);
+						igImage(*cast(ImTextureID*)_worldView.getRendereredFrame().getHandle(), drawAreaSize);
 					}
 					igSameLine();
-
 					{ // right
 						igBeginChild("Right Pane", ImVec2(rightPanelSizeWidth, 0), true);
 						if (igCollapsingHeader("Position")) {
@@ -263,26 +291,6 @@ public:
 				}
 				igEndChild();
 			}
-
-			/*igBeginDockspace();
-
-			if (igBeginDock("World view", null, 0, ImVec2(0, 0), ImVec2(0, 0))) {
-				igButton("THIS IS THE WORLD", ImVec2(1280, 720));
-
-				igSetNextDock(ImGuiDockSlot.ImGuiDockSlot_Left);
-				if (igBeginDock("Toolbar", null, 0, ImVec2(0, 0), ImVec2(0, 0))) {
-					igButton("a");
-					igButton("b");
-					igButton("c");
-					igButton("d");
-				}
-				igEndDock();
-
-				igSetNextDock(ImGuiDockSlot.ImGuiDockSlot_Right);
-				if (igBeginDock("Settings", null, 0, ImVec2(0, 0), ImVec2(0, 0))) {
-
-				}
-			}*/
 		}
 		igEnd();
 		if (_showDemoWindow)
@@ -304,7 +312,6 @@ public:
 		import std.string : toStringz;
 
 		ImGuiIO* io = igGetIO();
-
 		foreach (Event event; events)
 			event.tryVisit!((ref MouseWheelEvent wheel) {
 				if (wheel.deltaY > 0)
@@ -343,7 +350,6 @@ public:
 		if (g_VertHandle)
 			glDeleteShader(g_VertHandle);
 		g_VertHandle = 0;
-
 		if (g_ShaderHandle && g_FragHandle)
 			glDetachShader(g_ShaderHandle, g_FragHandle);
 		if (g_FragHandle)
@@ -353,7 +359,6 @@ public:
 		if (g_ShaderHandle)
 			glDeleteProgram(g_ShaderHandle);
 		g_ShaderHandle = 0;
-
 		if (g_FontTexture) {
 			glDeleteTextures(1, &g_FontTexture);
 			ImFontAtlas_SetTexID(igGetIO().Fonts, cast(void*)0);
@@ -361,12 +366,18 @@ public:
 		}
 	}
 
+	@property IUIView worldView() {
+		return _worldView;
+	}
+
+	@property void worldView(IUIView view) {
+		_worldView = view;
+	}
+
 private:
 	static IView _view;
-
-	static bool _showDemoWindow = true;
-
-	// Data
+	IUIView _worldView;
+	static bool _showDemoWindow = true; // Data
 	static double g_Time = 0.0f;
 	static bool[3] g_MousePressed = [false, false, false];
 	static float g_MouseWheel = 0.0f;
@@ -375,7 +386,6 @@ private:
 	static int g_AttribLocationTex, g_AttribLocationProjMtx;
 	static int g_AttribLocationPosition, g_AttribLocationUV, g_AttribLocationColor;
 	static uint g_VboHandle, g_VaoHandle, g_ElementsHandle;
-
 	bool _createDeviceObjects() {
 		import std.file : readText;
 
@@ -384,19 +394,16 @@ private:
 		glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
 		glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
 		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
-
 		import rebel.engine;
 		import rebel.input.filesystem;
 
 		FileSystem fs = Engine.instance.fileSystem;
-
 		GLchar[] vertex_shader;
 		scope (exit)
 			vertex_shader.destroy;
 		GLchar[] fragment_shader;
 		scope (exit)
 			fragment_shader.destroy;
-
 		{
 			FSFile file = fs.open("imgui/base.vert", FileMode.read);
 			scope (exit)
@@ -414,7 +421,6 @@ private:
 
 		const GLchar* vertex_shader_ptr = &vertex_shader[0];
 		const GLchar* fragment_shader_ptr = &fragment_shader[0];
-
 		g_ShaderHandle = glCreateProgram();
 		g_VertHandle = glCreateShader(GL_VERTEX_SHADER);
 		g_FragHandle = glCreateShader(GL_FRAGMENT_SHADER);
@@ -422,7 +428,6 @@ private:
 		glShaderSource(g_FragHandle, 1, &fragment_shader_ptr, null);
 
 		glCompileShader(g_VertHandle);
-
 		GLint status;
 		glGetShaderiv(g_VertHandle, GL_COMPILE_STATUS, &status);
 		if (status == GL_FALSE) {
@@ -431,13 +436,11 @@ private:
 
 			GLuint len;
 			glGetShaderiv(g_VertHandle, GL_INFO_LOG_LENGTH, cast(GLint*)&len);
-
 			GLchar[] errorLog;
 			scope (exit)
 				errorLog.destroy;
 			errorLog.length = len;
 			glGetShaderInfoLog(g_VertHandle, len, &len, &errorLog[0]);
-
 			writefln("[error] Shader compilation failed %s (%u):\n%s", "<Vertex>", g_VertHandle, errorLog.ptr.fromStringz);
 		}
 
@@ -455,14 +458,12 @@ private:
 				errorLog.destroy;
 			errorLog.length = len;
 			glGetShaderInfoLog(g_FragHandle, len, &len, &errorLog[0]);
-
 			writefln("[error] Shader compilation failed %s (%u):\n%s", "<Fragment>", g_FragHandle, errorLog.ptr.fromStringz);
 		}
 
 		glAttachShader(g_ShaderHandle, g_VertHandle);
 		glAttachShader(g_ShaderHandle, g_FragHandle);
 		glLinkProgram(g_ShaderHandle);
-
 		glGetProgramiv(g_ShaderHandle, GL_LINK_STATUS, &status);
 		if (status == GL_FALSE) {
 			import std.stdio : writefln;
@@ -476,7 +477,6 @@ private:
 				errorLog.destroy;
 			errorLog.length = len;
 			glGetProgramInfoLog(g_ShaderHandle, len, &len, &errorLog[0]);
-
 			writefln("[error] Linking the program failed %u:\n%s", g_ShaderHandle, errorLog.ptr.fromStringz);
 		}
 
@@ -488,25 +488,20 @@ private:
 
 		glGenBuffers(1, &g_VboHandle);
 		glGenBuffers(1, &g_ElementsHandle);
-
 		glGenVertexArrays(1, &g_VaoHandle);
 		glBindVertexArray(g_VaoHandle);
 		glBindBuffer(GL_ARRAY_BUFFER, g_VboHandle);
 		glEnableVertexAttribArray(g_AttribLocationPosition);
 		glEnableVertexAttribArray(g_AttribLocationUV);
 		glEnableVertexAttribArray(g_AttribLocationColor);
-
 		glVertexAttribPointer(g_AttribLocationPosition, 2, GL_FLOAT, GL_FALSE, ImDrawVert.sizeof, cast(GLvoid*)ImDrawVert.pos.offsetof);
 		glVertexAttribPointer(g_AttribLocationUV, 2, GL_FLOAT, GL_FALSE, ImDrawVert.sizeof, cast(GLvoid*)ImDrawVert.uv.offsetof);
 		glVertexAttribPointer(g_AttribLocationColor, 4, GL_UNSIGNED_BYTE, GL_TRUE, ImDrawVert.sizeof, cast(GLvoid*)ImDrawVert.col.offsetof);
 
-		_createFontsTexture();
-
-		// Restore modified GL state
+		_createFontsTexture(); // Restore modified GL state
 		glBindTexture(GL_TEXTURE_2D, last_texture);
 		glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
 		glBindVertexArray(last_vertex_array);
-
 		return true;
 	}
 
@@ -520,9 +515,7 @@ private:
 		int fb_height = cast(uint)(io.DisplaySize.y * io.DisplayFramebufferScale.y);
 		if (fb_width == 0 || fb_height == 0)
 			return;
-		draw_data.ScaleClipRects(io.DisplayFramebufferScale);
-
-		// Backup GL state
+		draw_data.ScaleClipRects(io.DisplayFramebufferScale); // Backup GL state
 		GLenum last_active_texture;
 		glGetIntegerv(GL_ACTIVE_TEXTURE, cast(GLint*)&last_active_texture);
 		glActiveTexture(GL_TEXTURE0);
@@ -559,18 +552,14 @@ private:
 		GLboolean last_enable_blend = glIsEnabled(GL_BLEND);
 		GLboolean last_enable_cull_face = glIsEnabled(GL_CULL_FACE);
 		GLboolean last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
-		GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
-
-		// Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
+		GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST); // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
 		glEnable(GL_BLEND);
 		glBlendEquation(GL_FUNC_ADD);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glDisable(GL_CULL_FACE);
 		glDisable(GL_DEPTH_TEST);
 		glEnable(GL_SCISSOR_TEST);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-		// Setup viewport, orthographic projection matrix
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Setup viewport, orthographic projection matrix
 		glViewport(0, 0, cast(GLsizei)fb_width, cast(GLsizei)fb_height);
 		const float[4][4] ortho_projection = [[2.0f / io.DisplaySize.x, 0.0f, 0.0f, 0.0f], [
 			0.0f, 2.0f / -io.DisplaySize.y, 0.0f, 0.0f
@@ -643,7 +632,6 @@ private:
 
 		scope (failure)
 			return "";
-
 		return _view.clipboard.toStringz;
 	}
 
@@ -652,7 +640,6 @@ private:
 
 		scope (failure)
 			return;
-
 		_view.clipboard = cast(string)text.fromStringz;
 	}
 
@@ -674,9 +661,7 @@ private:
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
 		// Store our identifier
-		ImFontAtlas_SetTexID(io.Fonts, cast(void*)g_FontTexture);
-
-		// Restore state
+		ImFontAtlas_SetTexID(io.Fonts, cast(void*)g_FontTexture); // Restore state
 		glBindTexture(GL_TEXTURE_2D, last_texture);
 	}
 

@@ -3,6 +3,7 @@ module rebel.renderer.glrenderer;
 import rebel.view;
 import rebel.renderer;
 import rebel.config;
+import rebel.handle;
 
 import dlsl.vector;
 
@@ -47,6 +48,11 @@ public:
 	void finalize() {
 	}
 
+	//TODO:
+	Renderpass construct(const ref RenderpassBuilder builder) {
+		return _renderpasses.create();
+	}
+
 	@property RendererType renderType() const {
 		return RendererType.opengl;
 	}
@@ -56,11 +62,25 @@ public:
 	}
 
 private:
+	struct GLRenderpassData {
+		RenderpassData base;
+		alias base this;
+
+		struct Pass {
+			GLuint[GLuint] inputs;
+			GLuint fbo;
+		}
+
+	}
+
 	string _gameName;
 	Version _gameVersion;
 	IVulkanView _view;
 
-	static extern(C) void glDebugLog(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/ , const GLchar* message, const void*  /*userParam*/ ) {
+	HandleStorage!(Renderpass, GLRenderpassData) _renderpasses;
+
+	static extern (C) void glDebugLog(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/ ,
+			const GLchar* message, const void*  /*userParam*/ ) {
 		if (id == 4 || id == 8 || id == 11 || id == 20 || id == 36 || id == 37 || id == 48 || id == 1282 || id == 131169
 				|| id == 131185 || id == 131218 || id == 131204)
 			return;
@@ -133,7 +153,7 @@ private:
 		import std.stdio : writefln;
 		import std.string : fromStringz;
 
-		writefln("[%s] GL error: Source %s, Type: %s, ID: %d, Severity: %s\n%s%s%s", level, sourceStr,
-				typeStr, id, severityStr, message.fromStringz, stackTrace.length ? "\n" : "", stackTrace);
+		writefln("[%s] GL error: Source %s, Type: %s, ID: %d, Severity: %s\n%s%s%s", level, sourceStr, typeStr, id,
+				severityStr, message.fromStringz, stackTrace.length ? "\n" : "", stackTrace);
 	}
 }

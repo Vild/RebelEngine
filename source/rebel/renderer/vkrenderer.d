@@ -3,6 +3,7 @@ module rebel.renderer.vkrenderer;
 import rebel.config;
 import rebel.renderer;
 import rebel.view;
+import rebel.handle;
 
 import erupted;
 import erupted.dispatch_device;
@@ -27,11 +28,66 @@ extern (C) static VkBool32 vulkanDebugCallback(VkDebugReportFlagsEXT flags, VkDe
 
 	try {
 		stderr.writefln("Validation layer: %s", msg.fromStringz);
-	}
-	catch (Exception) {
+	} catch (Exception) {
 	}
 
 	return VK_FALSE;
+}
+
+private {
+	VkFormat translate(ImageFormat format) {
+		final switch (format) {
+		case ImageFormat.undefined:
+			return VkFormat.VK_FORMAT_UNDEFINED;
+		case ImageFormat.rgb888:
+			return VkFormat.VK_FORMAT_R8G8B8_SNORM;
+		case ImageFormat.rgba8888:
+			return VkFormat.VK_FORMAT_R8G8B8A8_SNORM;
+		case ImageFormat.rgba16f:
+			return VkFormat.VK_FORMAT_R16G16B16A16_SFLOAT;
+		case ImageFormat.rgba32f:
+			return VkFormat.VK_FORMAT_R32G32B32A32_SFLOAT;
+		}
+	}
+
+	VkImageLayout translate(ImageLayout layout) {
+		final switch (layout) {
+		case ImageLayout.undefined:
+			return VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+		case ImageLayout.color:
+			return VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		case ImageLayout.present:
+			return VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		case ImageLayout.depthStencil:
+			return VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		}
+	}
+
+	VkAttachmentLoadOp translate(LoadOperation op) {
+		final switch (op) {
+		case LoadOperation.load:
+			return VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_LOAD;
+		case LoadOperation.clear:
+			return VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
+		case LoadOperation.dontCare:
+			return VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		}
+	}
+
+	VkAttachmentStoreOp translate(StoreOperation op) {
+		final switch (op) {
+		case StoreOperation.store:
+			return VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_STORE;
+		case StoreOperation.dontCare:
+			return VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		}
+	}
+	VkPipelineBindPoint translate(SubpassBindPoint op) {
+		final switch (op) {
+		case SubpassBindPoint.graphics:
+			return VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
+		}
+	}
 }
 
 final class VKRenderer : IVulkanRenderer {
@@ -72,6 +128,11 @@ public:
 	}
 
 	void finalize() {
+	}
+
+	//TODO:
+	Renderpass construct(const ref RenderpassBuilder builder) {
+		return _renderpasses.create(builder);
 	}
 
 	@property RendererType renderType() const {
@@ -127,6 +188,70 @@ private:
 		}
 	}
 
+	struct VKRenderpassData {
+		RenderpassData base;
+		alias base this;
+
+		VkRenderPass renderPass;
+
+		this(const ref RenderpassBuilder builder) {
+
+			VkAttachmentDescription[] attachments;
+			attachments.length = builder.attachments.length;
+			foreach (idx, const Attachment* attr; builder.attachments) {
+				VkAttachmentDescription* desc = &attachments[idx];
+
+				desc.format = attr.format.translate;
+				desc.samples = cast(VkSampleCountFlagBits)attr.samples;
+				desc.loadOp = attr.loadOp.translate;
+				desc.storeOp = attr.storeOp.translate;
+				desc.stencilLoadOp = attr.stencilLoadOp.translate;
+				desc.stencilStoreOp = attr.stencilStoreOp.translate;
+				desc.initialLayout = attr.initialLayout.translate;
+				desc.finalLayout = attr.finalLayout.translate;
+			}
+
+			VkSubpassDescription[] subpasses;
+			subpasses.length = builder.subpasses.length;
+
+			foreach (idx, const Subpass* sp; builder.subpasses) {
+				VkSubpassDescription* subpass = &subpasses[idx];
+
+				VkAttachmentReference[] colorAttachments;
+				colorAttachments.length = sp.colorOutput.length;
+				foreach (idx2, const ref SubpassAttachment sa; sp.colorOutput) {
+					import std.algorithm : countUntil;
+					VkAttachmentReference* attach = &colorAttachments[idx2];
+					attach.attachment = cast(uint)builder.attachments.countUntil(sa.attachment);
+					attach.layout = sa.layout.translate;
+				}
+
+				subpass.pipelineBindPoint = sp.bindPoint.translate;
+				subpass.colorAttachmentCount = cast(uint)colorAttachments.length;
+				subpass.pColorAttachments = colorAttachments.ptr;
+			}
+
+			VkSubpassDependency dependency;
+			dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+			dependency.dstSubpass = 0;
+			dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			dependency.srcAccessMask = 0;
+			dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+			VkRenderPassCreateInfo renderPassInfo;
+			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+			renderPassInfo.attachmentCount = 1;
+			renderPassInfo.pAttachments = &colorAttachment;
+			renderPassInfo.subpassCount = 1;
+			renderPassInfo.pSubpasses = &subpass;
+			renderPassInfo.dependencyCount = 1;
+			renderPassInfo.pDependencies = &dependency;
+
+			vkAssert(_devices[0].dispatch.CreateRenderPass(&renderPassInfo, &renderPass));
+		}
+	}
+
 	string _gameName;
 	Version _gameVersion;
 	IVulkanView _view;
@@ -136,6 +261,8 @@ private:
 	VkSurfaceKHR _surface;
 
 	Device[] _devices;
+
+	HandleStorage!(Renderpass, VKRenderpassData) _renderpasses;
 
 	void _createInstance() {
 		import std.stdio;
