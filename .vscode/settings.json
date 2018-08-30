@@ -17,5 +17,16 @@
 		".*": true,
 		"*.log": true,
 		"*~": true
+	},
+	"files.associations": {
+		"*.wild": "java",
+		"*.ds": "dscript",
+		"*.S": "asm",
+		"*.sass": "scss",
+		"Jenkinsfile": "declarative",
+		"hash_map": "cpp",
+		"*.tcc": "cpp",
+		"deque": "cpp",
+		"vector": "cpp"
 	}
 }

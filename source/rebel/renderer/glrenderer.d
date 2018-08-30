@@ -49,15 +49,15 @@ public:
 	}
 
 	//TODO:
-	RenderPass construct(const ref RenderPassBuilder builder) {
+	RenderPass construct(ref RenderPassBuilder builder) {
 		return _renderPasses.create();
 	}
 	//TODO:
-	ShaderModule construct(const ref ShaderModuleBuilder builder) {
+	ShaderModule construct(ref ShaderModuleBuilder builder) {
 		return _shaderModules.create();
 	}
 	//TODO:
-	Pipeline construct(const ref PipelineBuilder builder) {
+	Pipeline construct(ref PipelineBuilder builder) {
 		return _pipelines.create();
 	}
 

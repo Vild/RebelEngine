@@ -13,14 +13,19 @@ struct VkPipelineData {
 	PipelineData base;
 	alias base this;
 
+	PipelineBuilder builder;
 	Device* device;
 
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 
-	this(const ref PipelineBuilder builder, Device* device) {
+	this(ref PipelineBuilder builder, Device* device) {
+		this.builder = builder;
 		this.device = device;
+		create();
+	}
 
+	void create() {
 		IRenderer renderer = Engine.instance.renderer;
 		VkPipelineShaderStageCreateInfo[] shaderStages;
 
@@ -140,8 +145,12 @@ struct VkPipelineData {
 	~this() {
 		if (!device)
 			return;
+		cleanup();
+		device = null;
+	}
+
+	void cleanup() {
 		device.dispatch.DestroyPipeline(graphicsPipeline);
 		device.dispatch.DestroyPipelineLayout(pipelineLayout);
-		device = null;
 	}
 }

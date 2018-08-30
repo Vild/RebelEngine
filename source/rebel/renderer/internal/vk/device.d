@@ -32,6 +32,7 @@ struct Device {
 	VkSwapchainKHR swapChain;
 	VkImage[] swapChainImages;
 	VkImageView[] swapChainImageViews;
+	VkFramebuffer[] swapChainFramebuffers;
 
 	VkDescriptorPool descriptorPool;
 

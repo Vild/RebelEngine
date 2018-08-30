@@ -103,6 +103,8 @@ struct SubpassDependency {
 }
 
 struct RenderPassBuilder {
+	bool isFinalScreenRenderPass; //TODO: remove this hack
+
 	Attachment*[] attachments;
 
 	Subpass*[] subpasses;
@@ -174,7 +176,13 @@ enum FrontFaceMode {
 }
 
 enum SampleCount {
-	Sample1, Sample2, Sample4, Sample8, Sample16, Sample32, Sample64
+	Sample1,
+	Sample2,
+	Sample4,
+	Sample8,
+	Sample16,
+	Sample32,
+	Sample64
 }
 
 struct RasterizationState {
@@ -249,9 +257,9 @@ interface IRenderer {
 	void newFrame();
 	void finalize();
 
-	RenderPass construct(const ref RenderPassBuilder builder);
-	ShaderModule construct(const ref ShaderModuleBuilder builder);
-	Pipeline construct(const ref PipelineBuilder builder);
+	RenderPass construct(ref RenderPassBuilder builder);
+	ShaderModule construct(ref ShaderModuleBuilder builder);
+	Pipeline construct(ref PipelineBuilder builder);
 
 	RenderPass.Ref get(RenderPass handler);
 	ShaderModule.Ref get(ShaderModule handler);

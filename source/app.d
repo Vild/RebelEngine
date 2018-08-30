@@ -64,6 +64,8 @@ private:
 			}
 
 			RenderPassBuilder builder;
+			builder.isFinalScreenRenderPass = true;
+
 			builder.attachments = [&colorAttachment];
 			builder.subpasses = [&subpass];
 			builder.dependencies = [dependency];

@@ -58,6 +58,8 @@ public:
 		_createVulkanLogicalDevice();
 		_createVulkanSwapChain();
 		_createVulkanImageViews();
+		//TODO: When can this be called
+		//_createFramebuffers();
 	}
 
 	~this() {
@@ -79,15 +81,15 @@ public:
 	void finalize() {
 	}
 
-	RenderPass construct(const ref RenderPassBuilder builder) {
+	RenderPass construct(ref RenderPassBuilder builder) {
 		return _renderPasses.create(builder, &_device);
 	}
 
-	ShaderModule construct(const ref ShaderModuleBuilder builder) {
+	ShaderModule construct(ref ShaderModuleBuilder builder) {
 		return _shaderModules.create(builder, &_device);
 	}
 
-	Pipeline construct(const ref PipelineBuilder builder) {
+	Pipeline construct(ref PipelineBuilder builder) {
 		return _pipelines.create(builder, &_device);
 	}
 
@@ -121,6 +123,24 @@ private:
 	HandleStorage!(RenderPass, VkRenderPassData) _renderPasses;
 	HandleStorage!(ShaderModule, VkShaderModuleData) _shaderModules;
 	HandleStorage!(Pipeline, VkPipelineData) _pipelines;
+
+	void _recreate() {
+		_device.dispatch.DeviceWaitIdle();
+
+		_createVulkanSwapChain();
+		_createVulkanImageViews();
+
+		foreach (ref VkRenderPassData renderPass; _renderPasses) {
+			renderPass.cleanup();
+			renderPass.create();
+		}
+		foreach (ref VkPipelineData pipeline; _pipelines) {
+			pipeline.cleanup();
+			pipeline.create();
+		}
+		_createFramebuffers();
+		//createCommandBuffers();
+	}
 
 	void _createInstance() {
 		import std.stdio;
@@ -361,6 +381,31 @@ private:
 			createInfo.subresourceRange.baseArrayLayer = 0;
 			createInfo.subresourceRange.layerCount = 1;
 			_device.dispatch.CreateImageView(&createInfo, &_device.swapChainImageViews[i]);
+		}
+	}
+
+	// TODO: Refactor into handle type!
+	void _createFramebuffers() {
+		_device.swapChainFramebuffers.length = _device.swapChainImageViews.length;
+
+		foreach (i, imageView; _device.swapChainImageViews) {
+			VkImageView[] attachments = [imageView];
+
+			VkFramebufferCreateInfo framebufferInfo;
+			foreach (VkRenderPassData renderPass; _renderPasses) {
+				if (renderPass.isFinalScreenRenderPass) {
+					framebufferInfo.renderPass = renderPass.renderPass;
+					break;
+				}
+			}
+			// TODO: what if framebufferInfo.renderPass is null
+			framebufferInfo.pAttachments = attachments.ptr;
+			framebufferInfo.attachmentCount = cast(uint)attachments.length;
+			framebufferInfo.width = _device.swapChainExtent.width;
+			framebufferInfo.height = _device.swapChainExtent.height;
+			framebufferInfo.layers = 1;
+
+			vkAssert(_device.dispatch.CreateFramebuffer(&framebufferInfo, &_device.swapChainFramebuffers[i]));
 		}
 	}
 }

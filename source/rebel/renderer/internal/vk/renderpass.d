@@ -11,12 +11,20 @@ struct VkRenderPassData {
 	RenderPassData base;
 	alias base this;
 
+	RenderPassBuilder builder;
+	bool isFinalScreenRenderPass;
+
 	VkRenderPass renderPass;
 	Device* device;
 
-	this(const ref RenderPassBuilder builder, Device* device) {
+	this(ref RenderPassBuilder builder, Device* device) {
+		this.builder = builder;
+		isFinalScreenRenderPass = builder.isFinalScreenRenderPass;
 		this.device = device;
+		create();
+	}
 
+	void create() {
 		VkAttachmentDescription[] attachments;
 		attachments.length = builder.attachments.length;
 		foreach (idx, const Attachment* attr; builder.attachments) {
@@ -85,8 +93,13 @@ struct VkRenderPassData {
 	}
 
 	~this() {
-		if (device)
-			device.dispatch.DestroyRenderPass(renderPass);
+		if (!device)
+			return;
+		cleanup();
 		device = null;
+	}
+
+	void cleanup() {
+		device.dispatch.DestroyRenderPass(renderPass);
 	}
 }

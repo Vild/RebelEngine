@@ -144,4 +144,25 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 			handles[h.id].inUse = false;
 		}
 	}
+
+	int opApply(int delegate(ref Type data) dg) {
+		foreach (h; handles) {
+			if (!h.inUse)
+				continue;
+			if (auto _ = dg(data[h.id]))
+				return _;
+		}
+		return 0;
+	}
+
+	int opApply(int delegate(size_t idx, ref Type data) dg) {
+		foreach (h; handles) {
+			if (!h.inUse)
+				continue;
+			if (auto _ = dg(h.id, data[h.id]))
+				return _;
+		}
+		return 0;
+	}
+
 }
