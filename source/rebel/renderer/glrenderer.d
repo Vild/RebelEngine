@@ -49,9 +49,28 @@ public:
 	}
 
 	//TODO:
-	Renderpass construct(const ref RenderpassBuilder builder) {
-		return _renderpasses.create();
+	RenderPass construct(const ref RenderPassBuilder builder) {
+		return _renderPasses.create();
 	}
+	//TODO:
+	ShaderModule construct(const ref ShaderModuleBuilder builder) {
+		return _shaderModules.create();
+	}
+	//TODO:
+	Pipeline construct(const ref PipelineBuilder builder) {
+		return _pipelines.create();
+	}
+
+	RenderPass.Ref get(RenderPass handler) {
+		return _renderPasses.get(handler);
+	}
+	ShaderModule.Ref get(ShaderModule handler) {
+		return _shaderModules.get(handler);
+	}
+	Pipeline.Ref get(Pipeline handler) {
+		return _pipelines.get(handler);
+	}
+
 
 	@property RendererType renderType() const {
 		return RendererType.opengl;
@@ -62,8 +81,8 @@ public:
 	}
 
 private:
-	struct GLRenderpassData {
-		RenderpassData base;
+	struct GLRenderPassData {
+		RenderPassData base;
 		alias base this;
 
 		struct Pass {
@@ -73,11 +92,23 @@ private:
 
 	}
 
+	struct GLShaderModuleData {
+		ShaderModuleData base;
+		alias base this;
+	}
+
+	struct GLPipelineData {
+		PipelineData base;
+		alias base this;
+	}
+
 	string _gameName;
 	Version _gameVersion;
 	IVulkanView _view;
 
-	HandleStorage!(Renderpass, GLRenderpassData) _renderpasses;
+	HandleStorage!(RenderPass, GLRenderPassData) _renderPasses;
+	HandleStorage!(ShaderModule, GLShaderModuleData) _shaderModules;
+	HandleStorage!(Pipeline, GLPipelineData) _pipelines;
 
 	static extern (C) void glDebugLog(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/ ,
 			const GLchar* message, const void*  /*userParam*/ ) {

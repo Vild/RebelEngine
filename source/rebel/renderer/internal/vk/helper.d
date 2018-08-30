@@ -1,4 +1,4 @@
-module rebel.renderer.internal.vkhelper;
+module rebel.renderer.internal.vk.helper;
 
 import erupted;
 import erupted.dispatch_device;

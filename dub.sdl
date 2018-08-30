@@ -14,7 +14,7 @@ dependency ":imgui_extensions" version="*"
 # Rendering
 dependency "derelict-sdl2" version="~>3.1.0-alpha.4"
 dependency "derelict-imgui" path="3rdparty/DerelictImgui"
-dependency "erupted" version="~>2.0.2"
+dependency "erupted" version="~>2.0.9+v1.1.83"
 dependency "opengl:gl4" version="~>1.0.0"
 
 # I/O

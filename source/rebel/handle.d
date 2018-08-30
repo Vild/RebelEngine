@@ -24,10 +24,12 @@ struct Handle(Type_, size_t MaxCount_) {
 	import std.bitmanip : bitfields;
 	import std.math : log2, ceil;
 
+	alias Ref = HandleRefData!(typeof(this), Type_);
+
 	private alias Type = Type_;
 	private enum size_t MaxCount = MaxCount_;
 
-	private enum BitSize = cast(size_t)MaxCount.log2.ceil + 2 + 1 + 1;
+	private enum BitSize = cast(size_t)MaxCount.log2.ceil + 2 + 1 + 2;
 	private enum BitSizeRound = BitSize.roundUpToPowerOf2;
 
 	// dfmt off
@@ -35,7 +37,7 @@ struct Handle(Type_, size_t MaxCount_) {
 		size_t, "id", cast(size_t)MaxCount.log2.ceil,
 		ubyte, "magic", 2,
 		bool, "inUse", 1,
-		bool, "refGotten", 1,
+		ubyte, "refGotten", 2,
 		ulong, "", BitSizeRound - BitSize
 	));
 	// dfmt on
@@ -50,22 +52,37 @@ struct Handle(Type_, size_t MaxCount_) {
 	}*/
 }
 
-struct HandleRefData(HandleType, Type) if (is(HandleType : Handle!(Type, MaxCount), Type, size_t MaxCount)) {
-	@disable this();
+struct HandleRefData(HandleType_, Type) if (is(HandleType_ : Handle!(Type, MaxCount), Type, size_t MaxCount)) {
+	alias HandleType = HandleType_;
 
 	~this() {
-		_handle.refGotten = false;
+		if (_handle)
+			_handle.refGotten = cast(ubyte)(_handle.refGotten - 1);
 	}
 
-	@property ref Type get() {
-		return *_data;
+	@property ref T get(T = Type)() if (is(T == Type) || is(typeof(T.tupleof[0]) == Type)) {
+		return *cast(T*)_data;
 	}
 
-	alias get this;
+	/*alias get this;
+
+	auto opCast(T)() if (is(T.HandleType == HandleType)) {
+		return T(_handle, cast(typeof(T._data))_data);
+	}
+
+	alias to = opCast;*/
+
+	static if (!is(Type == HandleType.Type)) {
+		auto toBase() {
+			return HandleRefData!(HandleType, HandleType.Type)(_handle, cast(HandleType.Type*)_data);
+		}
+
+		alias toBase this;
+	}
 
 private:
 	this(HandleType* handle, Type* data) {
-		handle.refGotten = true;
+		_handle.refGotten = cast(ubyte)(_handle.refGotten + 1);
 		_handle = handle;
 		_data = data;
 	}
@@ -117,5 +134,14 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 
 		data[h.id].destroy;
 		handles[h.id].inUse = false;
+	}
+
+	void clear() {
+		foreach (h; handles) {
+			if (!h.inUse)
+				continue;
+			data[h.id].destroy;
+			handles[h.id].inUse = false;
+		}
 	}
 }

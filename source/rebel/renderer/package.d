@@ -82,7 +82,7 @@ struct Subpass {
 }
 
 enum Subpass* externalSubpass = null;
-enum StageMask {
+enum StageFlags {
 	colorOutput
 }
 
@@ -96,24 +96,149 @@ enum AccessMask {
 struct SubpassDependency {
 	Subpass* srcSubpass;
 	Subpass* dstSubpass;
-	StageMask srcStageMask;
-	StageMask dstStageMask;
+	StageFlags srcStageMask;
+	StageFlags dstStageMask;
 	AccessMask srcAccessMask;
 	AccessMask dstAccessMask;
 }
 
-struct RenderpassBuilder {
+struct RenderPassBuilder {
 	Attachment*[] attachments;
 
 	Subpass*[] subpasses;
-	SubpassDependency[] dependency;
+	SubpassDependency[] dependencies;
 }
 
-struct RenderpassData {
-
+struct RenderPassData {
 }
 
-alias Renderpass = Handle!(RenderpassData, 64);
+alias RenderPass = Handle!(RenderPassData, 64);
+
+// ======================
+
+enum ShaderType {
+	vertext,
+	fragment
+}
+
+struct ShaderModuleBuilder {
+	string sourcecode;
+	string entrypoint;
+	ShaderType type;
+}
+
+struct ShaderModuleData {
+}
+
+alias ShaderModule = Handle!(ShaderModuleData, 64);
+
+// ======================
+
+struct VertexInputBindingDescription {
+}
+
+struct VertexInputAttributeDescription {
+}
+
+enum VertexTopology {
+	triangleList
+}
+
+struct Viewport {
+	vec2 position = vec2(0, 0);
+	vec2 size = vec2(0, 0);
+	vec2 depthRange = vec2(0, 1);
+}
+
+struct Scissor {
+	ivec2 start;
+	uvec2 end;
+}
+
+enum PolygonMode {
+	fill,
+	line,
+	point
+}
+
+enum CullMode {
+	none,
+	front,
+	back,
+	frontAndBack
+}
+
+enum FrontFaceMode {
+	clockwise,
+	counterClockwise
+}
+
+enum SampleCount {
+	Sample1, Sample2, Sample4, Sample8, Sample16, Sample32, Sample64
+}
+
+struct RasterizationState {
+	bool depthClampEnable;
+	bool rasterizerDiscardEnable;
+	PolygonMode polygonMode;
+	float lineWidth;
+	CullMode cullMode;
+	FrontFaceMode frontFace;
+	bool depthBiasEnable;
+}
+
+enum ColorComponent {
+	r,
+	g,
+	b,
+	a
+}
+
+struct BlendAttachment {
+	ColorComponent colorWriteMask;
+	bool blendEnable;
+}
+
+enum LogicOp {
+	copy
+}
+
+struct BlendState {
+	bool logicOpEnable;
+	LogicOp logicOp;
+
+	BlendAttachment[] attachments;
+	float[4] blendConstants;
+}
+
+struct PipelineBuilder {
+	RenderPass renderpass;
+
+	ShaderModule[] shaderStages;
+
+	// == Input assembly ==
+	VertexInputBindingDescription[] vertexInputBindingDescriptions; // VkVertexInputBindingDescription
+	VertexInputAttributeDescription[] vertexInputAttributeDescriptions; //VkVertexInputAttributeDescription
+
+	VertexTopology vertexTopology;
+
+	// == ViewportState ==
+	Viewport[] viewports;
+	Scissor[] scissors;
+
+	// == Rasterizer ==
+	RasterizationState rasterizationState;
+	bool multisamplingEnabled;
+	SampleCount multisamplingCount;
+
+	BlendState blendState;
+}
+
+struct PipelineData {
+	// pipelineLayout
+}
+
+alias Pipeline = Handle!(PipelineData, 64);
 
 // ======================
 
@@ -124,7 +249,13 @@ interface IRenderer {
 	void newFrame();
 	void finalize();
 
-	Renderpass construct(const ref RenderpassBuilder builder);
+	RenderPass construct(const ref RenderPassBuilder builder);
+	ShaderModule construct(const ref ShaderModuleBuilder builder);
+	Pipeline construct(const ref PipelineBuilder builder);
+
+	RenderPass.Ref get(RenderPass handler);
+	ShaderModule.Ref get(ShaderModule handler);
+	Pipeline.Ref get(Pipeline handler);
 
 	@property RendererType renderType() const;
 }

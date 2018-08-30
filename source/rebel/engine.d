@@ -137,9 +137,9 @@ public:
 		view.initialize(renderer);
 		renderer.initialize(view);
 
-		_ui = new ImguiUI(view);
+		/*_ui = new ImguiUI(view);
 		_testView = new TestView();
-		_ui.worldView = _testView;
+		_ui.worldView = _testView;*/
 	}
 
 	int mainLoop() {
@@ -154,15 +154,19 @@ public:
 			_oldTime = curTime;
 
 			_view.doEvents(_events);
-			_ui.processEvents(_events);
+			if (_ui)
+				_ui.processEvents(_events);
 			_renderer.newFrame();
-			_ui.newFrame(delta);
+			if (_ui)
+				_ui.newFrame(delta);
 
-			_testView.render();
+			if (_testView)
+				_testView.render();
 
 			_currentState.update(delta);
 
-			_ui.endRender();
+			if (_ui)
+				_ui.endRender();
 			_renderer.finalize();
 			_view.finalizeFrame();
 
