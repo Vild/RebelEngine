@@ -170,8 +170,63 @@ int main(string[] args) {
 	scope (exit)
 		e.destroy;
 
-	e.attach(new SDLView("My SDL2 Window", ivec2(1920, 1080)), new VKRenderer("My Test Game", Version(0, 1, 0)));
-	//e.attach(new SDLView("My SDL2 Window", ivec2(1920, 1080)), new GLRenderer("My Test Game", Version(0, 1, 0)));
+	enum Renderer : int {
+		error = -1,
+		vulkan = 0,
+		gl45,
+		quit,
+	}
+
+	const string windowTitle = "My SDL2 Window";
+	const ivec2 windowSize = ivec2(1920, 1080);
+	const string gameName = "My Test Game";
+	const Version gameVersion = Version(0, 1, 0);
+
+	Renderer renderer = Renderer.vulkan;
+	if (args.length > 1 && args[1] == "selectRenderer") {
+		import derelict.sdl2.sdl;
+
+		// dfmt off
+		const SDL_MessageBoxButtonData[] buttons = [
+			SDL_MessageBoxButtonData(SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, Renderer.vulkan, "> Vulkan <"),
+			SDL_MessageBoxButtonData(0, Renderer.gl45, "OpenGL 4.5"),
+			SDL_MessageBoxButtonData(SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, Renderer.quit, "Quit"),
+		];
+		const SDL_MessageBoxColor[5] colorSchemeColors = [
+				SDL_MessageBoxColorType.SDL_MESSAGEBOX_COLOR_BACKGROUND: SDL_MessageBoxColor(0x00, 0x22, 0x22),
+				SDL_MessageBoxColorType.SDL_MESSAGEBOX_COLOR_TEXT: SDL_MessageBoxColor(0xAA, 0xAA, 0xAA),
+				SDL_MessageBoxColorType.SDL_MESSAGEBOX_COLOR_BUTTON_BORDER: SDL_MessageBoxColor(0x00, 0xFF, 0xFF),
+				SDL_MessageBoxColorType.SDL_MESSAGEBOX_COLOR_BUTTON_BACKGROUND: SDL_MessageBoxColor(0x00, 0x11, 0x11),
+				SDL_MessageBoxColorType.SDL_MESSAGEBOX_COLOR_BUTTON_SELECTED: SDL_MessageBoxColor(0xAA, 0xFF, 0xFF)
+		];
+		const SDL_MessageBoxColorScheme colorScheme = SDL_MessageBoxColorScheme(colorSchemeColors);
+		const SDL_MessageBoxData messageboxdata = SDL_MessageBoxData(
+				SDL_MESSAGEBOX_INFORMATION,
+				null,
+				"RebelEngine - Select renderer",
+				"Please select the renderer you want to use",
+				cast(int)buttons.length,
+				buttons.ptr,
+				&colorScheme
+		);
+		// dfmt on
+
+		if (SDL_ShowMessageBox(&messageboxdata, cast(int*)&renderer) < 0)
+			renderer = Renderer.error;
+	}
+
+	final switch (renderer) {
+	case Renderer.vulkan:
+		e.attach(new SDLView(windowTitle, windowSize), new VKRenderer(gameName, gameVersion));
+		break;
+	case Renderer.gl45:
+		e.attach(new SDLView(windowTitle, windowSize), new GLRenderer(gameName, gameVersion));
+		break;
+	case Renderer.error:
+		return -1;
+	case Renderer.quit:
+		return 0;
+	}
 
 	// e.socialService ~= DiscordSocialStatus.getInstance("447520822995845130");
 	e.currentState = new TestState;
