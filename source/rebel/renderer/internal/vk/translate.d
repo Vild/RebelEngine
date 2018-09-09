@@ -1,20 +1,50 @@
 module rebel.renderer.internal.vk.translate;
 
-import rebel.renderer;
 import erupted;
+
+import rebel.renderer.types;
 
 VkFormat translate(ImageFormat format) {
 	final switch (format) {
 	case ImageFormat.undefined:
 		return VkFormat.VK_FORMAT_UNDEFINED;
-	case ImageFormat.rgb888:
-		return VkFormat.VK_FORMAT_R8G8B8_SNORM;
-	case ImageFormat.rgba8888:
-		return VkFormat.VK_FORMAT_R8G8B8A8_SNORM;
-	case ImageFormat.rgba16f:
+	case ImageFormat.rgb8_unorm:
+		return VkFormat.VK_FORMAT_R8G8B8_UNORM;
+	case ImageFormat.rgba8_unorm:
+		return VkFormat.VK_FORMAT_R8G8B8A8_UNORM;
+	case ImageFormat.rgba16_float:
 		return VkFormat.VK_FORMAT_R16G16B16A16_SFLOAT;
-	case ImageFormat.rgba32f:
+	case ImageFormat.rgba32_float:
 		return VkFormat.VK_FORMAT_R32G32B32A32_SFLOAT;
+
+	case ImageFormat.bgr8_unorm:
+		return VkFormat.VK_FORMAT_B8G8R8_UNORM;
+	case ImageFormat.bgra8_unorm:
+		return VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
+	}
+}
+
+ImageFormat translate(VkFormat format) {
+	switch (format) {
+	case VkFormat.VK_FORMAT_UNDEFINED:
+		return ImageFormat.undefined;
+	case VkFormat.VK_FORMAT_R8G8B8_UNORM:
+		return ImageFormat.rgb8_unorm;
+	case VkFormat.VK_FORMAT_R8G8B8A8_UNORM:
+		return ImageFormat.rgba8_unorm;
+	case VkFormat.VK_FORMAT_R16G16B16A16_SFLOAT:
+		return ImageFormat.rgba16_float;
+	case VkFormat.VK_FORMAT_R32G32B32A32_SFLOAT:
+		return ImageFormat.rgba32_float;
+
+	case VkFormat.VK_FORMAT_B8G8R8_UNORM:
+		return ImageFormat.bgr8_unorm;
+	case VkFormat.VK_FORMAT_B8G8R8A8_UNORM:
+		return ImageFormat.bgra8_unorm;
+	default:
+		import std.format : f = format;
+
+		assert(0, f!"Unknown format: %s"(format));
 	}
 }
 
@@ -24,10 +54,14 @@ VkImageLayout translate(ImageLayout layout) {
 		return VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
 	case ImageLayout.color:
 		return VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	case ImageLayout.colorReadOnly:
+		return VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL | VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	case ImageLayout.present:
 		return VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	case ImageLayout.depthStencil:
 		return VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	case ImageLayout.depthStencilReadOnly:
+		return VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL | VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 }
 
@@ -80,7 +114,7 @@ VkAccessFlags translate(AccessMask am) {
 
 VkShaderStageFlagBits translate(ShaderType st) {
 	final switch (st) {
-	case ShaderType.vertext:
+	case ShaderType.vertex:
 		return VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT;
 	case ShaderType.fragment:
 		return VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -165,5 +199,18 @@ VkLogicOp translate(LogicOp lo) {
 	final switch (lo) {
 	case LogicOp.copy:
 		return VkLogicOp.VK_LOGIC_OP_COPY;
+	}
+}
+
+VkImageUsageFlags translate(ImageUsage iu) {
+	final switch (iu) {
+	case ImageUsage.presentAttachment:
+		return VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	case ImageUsage.colorAttachment:
+		return VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	case ImageUsage.depthAttachment:
+		return VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	case ImageUsage.depthStencilAttachment:
+		return VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	}
 }

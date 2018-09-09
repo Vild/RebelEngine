@@ -1,0 +1,68 @@
+#+TITLE: Vulkan Terminology
+
+#+BEGIN_SRC dot :file dependencygraph.png
+digraph "Vulkan" {
+RP[label="RenderPass"]
+DSL[label="Descriptor Set Layout"]
+PL[label="Pipeline Layout"]
+P[label="Pipeline"]
+I[label="Image"]
+IV[label="ImageView"]
+FB[label="Framebuffer"]
+CB[label="CommandBuffer"]
+
+PL -> DSL
+P -> PL
+P -> RP
+
+IV -> I
+FB -> IV 
+
+RP -> FB [style=dotted]
+
+CB -> FB [label="Where to render to"]
+CB -> RP [label="What to render with"]
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:dependencygraph.png]]
+
+* RenderPass
+A RenderPass is an object that defined the rendering process, what the outputs
+are. It *does not* specifiy the object that will be rendered to. It only
+specifies the formats and types.
+
+* Descriptor Set Layout
+This one defined the inputs to the shaders.
+Each of the binding numbers will be configured to a buffer. (Uniform-, Storage-,
+SamplerBuffers) and at what shader type it will be accessed at (vertex,
+fragment, etc.).
+
+* Pipeline Layout
+This convertes [[Descriptor Set Layout]] to a pipeline type.
+
+* Pipeline
+The Pipeline uses [[Pipeline Layout]] and the [[RenderPass]].
+The Pipeline defined how the GPU will render the scene (viewport, rasterizer,
+multisampling, colorblending, etc.).
+The Pipeline also contains the shader code.
+
+* Image
+An Image specifies how a block of bytes can be interpreted as a image.
+A memory block will be attached to this object.
+
+With this one you can address pixels instead of bytes.
+
+* ImageView
+An ImageView is a intermediate type for specifying how images look for shaders.
+Basically a middlehand between the shader and the Image.
+
+* Framebuffer
+A Framebuffer specifies a number of outputs, they are of the type
+[[ImageView]]. These outputs can be both color and depth.
+These outputs is what the [[RenderPass]] references.
+
+* CommandBuffer
+This specifies the [[Pipeline]] that will do the rendering, and it specifies the
+[[Framebuffer]] that will be rendered to.

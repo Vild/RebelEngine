@@ -1,25 +1,16 @@
-#version 440 core
+#version 460 core
+#extension GL_ARB_separate_shader_objects : enable
 
+out gl_PerVertex { vec4 gl_Position; };
 
-layout(set = 0, binding=0) buffer pos { vec2 position_in[]; };
-layout(set = 1, binding=1) buffer uv { vec2 uv_in[]; };
-layout(set = 2, binding=2) buffer color { vec4 color_in[]; };
+layout(location = 0) out vec3 fragColor;
 
-layout(set = 3, binding = 3) uniform vp {
-	uniform mat4 vp_in;
-};
+vec2 positions[3] = {vec2(0.0, -0.5), vec2(0.5, 0.5), vec2(-0.5, 0.5)};
 
-out gl_PerVertex {
-	vec4 gl_Position;
-};
-
-layout(location = 0) out VertexData {
-	vec4 color;
-	vec2 uv;
-} outData;
+vec3 colors[3] = {vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0),
+                  vec3(0.0, 0.0, 1.0)};
 
 void main() {
-	outData.color = color_in[gl_VertexIndex];
-	outData.uv = uv_in[gl_VertexIndex];
-	gl_Position = vp_in * vec4(position_in[gl_VertexIndex].xy, 0, 1);
+  gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
+  fragColor = colors[gl_VertexIndex];
 }

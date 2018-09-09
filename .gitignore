@@ -16,3 +16,5 @@ rebelengine-test-*
 dub.selections.json
 /bin
 imgui.ini
+*~
+CppCode*

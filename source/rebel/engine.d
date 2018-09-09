@@ -185,7 +185,7 @@ public:
 			_currentState.destroy;
 			_currentState = null;
 		}
-
+//{assert(0, "QUITING");}
 		return 0;
 	}
 

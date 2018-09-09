@@ -3,22 +3,26 @@ module rebel.renderer.internal.vk.shadermodule;
 import rebel.renderer;
 import erupted;
 
-import rebel.renderer.internal.vk.device;
-import rebel.renderer.internal.vk.helper;
-import rebel.renderer.internal.vk.translate;
+import rebel.renderer.internal.vk;
 
-struct VkShaderModuleData {
+struct VKShaderModuleData {
 	ShaderModuleData base;
 	alias base this;
 
-	VkShaderModule shaderModule;
-	Device* device;
+	ShaderModuleBuilder builder;
+	VKDevice* device;
 
+	VkShaderModule shaderModule;
 	VkPipelineShaderStageCreateInfo stageInfo;
 
-	this(const ref ShaderModuleBuilder builder, Device* device) {
-		import std.string : toStringz;
+	this(ref ShaderModuleBuilder builder, VKDevice* device) {
+		this.builder = builder;
 		this.device = device;
+		create();
+	}
+
+	void create() {
+		import std.string : toStringz;
 
 		VkShaderModuleCreateInfo createinfo;
 		createinfo.pCode = cast(uint*)builder.sourcecode.ptr;
@@ -26,15 +30,21 @@ struct VkShaderModuleData {
 
 		vkAssert(device.dispatch.CreateShaderModule(&createinfo, &shaderModule));
 
-		stageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 		stageInfo._module = shaderModule;
-		stageInfo.pName = builder.entrypoint.toStringz;
+		stageInfo.pName = "main";//builder.entrypoint.toStringz;
 		stageInfo.stage = builder.type.translate;
 	}
 
 	~this() {
-		if (device)
-			device.dispatch.DestroyShaderModule(shaderModule);
+		if (!device)
+			return;
+		cleanup();
 		device = null;
 	}
+
+	void cleanup() {
+		device.dispatch.DestroyShaderModule(shaderModule);
+	}
 }
+
+static assert(isCorrectVulkanData!VKShaderModuleData);

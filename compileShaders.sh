@@ -2,5 +2,7 @@
 
 cd assets/base/vktest
 
-glslangValidator base.vert -V
-glslangValidator base.frag -V
+rm *.spv
+
+glslangValidator base.vert -V110 -e main -S vert -o vert.spv
+glslangValidator base.frag -V110 -e main -S frag -o frag.spv

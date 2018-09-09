@@ -1,14 +1,8 @@
-#version 440 core
+#version 460 core
+#extension GL_ARB_separate_shader_objects : enable
 
-layout(location = 0) in VertexData {
-	vec4 color;
-	vec2 uv;
-} inData;
+layout(location = 0) in vec3 fragColor;
 
-layout(location = 0) out vec4 fragOutput;
+layout(location = 0) out vec4 outColor;
 
-layout(set = 6, binding=0) uniform sampler2D fontTexture;
-
-void main() {
-	fragOutput = inData.color * texture(fontTexture, inData.uv.st);
-}
+void main() { outColor = vec4(fragColor, 1.0); }

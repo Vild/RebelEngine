@@ -48,29 +48,43 @@ public:
 	void finalize() {
 	}
 
-	//TODO:
-	RenderPass construct(ref RenderPassBuilder builder) {
-		return _renderPasses.create();
-	}
-	//TODO:
-	ShaderModule construct(ref ShaderModuleBuilder builder) {
-		return _shaderModules.create();
-	}
-	//TODO:
-	Pipeline construct(ref PipelineBuilder builder) {
-		return _pipelines.create();
+	// dfmt off
+	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(/*builder*/); }
+	Image construct(ref ImageBuilder builder) { return _images.create(/*builder*/); }
+	ImageTemplate construct(ref ImageTemplateBuilder builder) { return _imageTemplates.create(/*builder*/); }
+	Pipeline construct(ref PipelineBuilder builder) { return _pipelines.create(/*builder*/); }
+	RenderPass construct(ref RenderPassBuilder builder) { return _renderPasses.create(/*builder*/); }
+	ShaderModule construct(ref ShaderModuleBuilder builder) { return _shaderModules.create(/*builder*/); }
+
+	Framebuffer.Ref get(Framebuffer handler) { return _framebuffers.get(handler); }
+	Image.Ref get(Image handler) { return _images.get(handler); }
+	ImageTemplate.Ref get(ImageTemplate handler) { return _imageTemplates.get(handler); }
+	Pipeline.Ref get(Pipeline handler) { return _pipelines.get(handler); }
+	RenderPass.Ref get(RenderPass handler) { return _renderPasses.get(handler); }
+	ShaderModule.Ref get(ShaderModule handler) { return _shaderModules.get(handler); }
+
+	void destruct(Framebuffer handler) { return _framebuffers.remove(handler); }
+	void destruct(Image handler) { return _images.remove(handler); }
+	void destruct(ImageTemplate handler) { return _imageTemplates.remove(handler); }
+	void destruct(Pipeline handler) { return _pipelines.remove(handler); }
+	void destruct(RenderPass handler) { return _renderPasses.remove(handler); }
+	void destruct(ShaderModule handler) { return _shaderModules.remove(handler); }
+	// dfmt on
+
+	@property ImageTemplate framebufferImageTemplate() {
+		return ImageTemplate();
 	}
 
-	RenderPass.Ref get(RenderPass handler) {
-		return _renderPasses.get(handler);
-	}
-	ShaderModule.Ref get(ShaderModule handler) {
-		return _shaderModules.get(handler);
-	}
-	Pipeline.Ref get(Pipeline handler) {
-		return _pipelines.get(handler);
+	@property void outputRenderPass(RenderPass renderpass) {
 	}
 
+	@property Framebuffer[] outputFramebuffers() {
+		return [_outputFramebuffer];
+	}
+
+	@property size_t outputToIdx() {
+		return 0;
+	}
 
 	@property RendererType renderType() const {
 		return RendererType.opengl;
@@ -81,34 +95,18 @@ public:
 	}
 
 private:
-	struct GLRenderPassData {
-		RenderPassData base;
-		alias base this;
-
-		struct Pass {
-			GLuint[GLuint] inputs;
-			GLuint fbo;
-		}
-
-	}
-
-	struct GLShaderModuleData {
-		ShaderModuleData base;
-		alias base this;
-	}
-
-	struct GLPipelineData {
-		PipelineData base;
-		alias base this;
-	}
-
 	string _gameName;
 	Version _gameVersion;
 	IVulkanView _view;
 
-	HandleStorage!(RenderPass, GLRenderPassData) _renderPasses;
-	HandleStorage!(ShaderModule, GLShaderModuleData) _shaderModules;
-	HandleStorage!(Pipeline, GLPipelineData) _pipelines;
+	HandleStorage!(Framebuffer, FramebufferData) _framebuffers;
+	HandleStorage!(Image, ImageData) _images;
+	HandleStorage!(ImageTemplate, ImageTemplateData) _imageTemplates;
+	HandleStorage!(Pipeline, PipelineData) _pipelines;
+	HandleStorage!(RenderPass, RenderPassData) _renderPasses;
+	HandleStorage!(ShaderModule, ShaderModuleData) _shaderModules;
+
+	Framebuffer _outputFramebuffer;
 
 	static extern (C) void glDebugLog(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/ ,
 			const GLchar* message, const void*  /*userParam*/ ) {

@@ -29,13 +29,14 @@ struct Handle(Type_, size_t MaxCount_) {
 	private alias Type = Type_;
 	private enum size_t MaxCount = MaxCount_;
 
-	private enum BitSize = cast(size_t)MaxCount.log2.ceil + 2 + 1 + 2;
+	private enum BitSize = 1 + cast(size_t)MaxCount.log2.ceil + 4 + 1 + 2;
 	private enum BitSizeRound = BitSize.roundUpToPowerOf2;
 
 	// dfmt off
 	mixin(bitfields!(
+		bool, "instantiate", 1,
 		size_t, "id", cast(size_t)MaxCount.log2.ceil,
-		ubyte, "magic", 2,
+		ubyte, "magic", 4,
 		bool, "inUse", 1,
 		ubyte, "refGotten", 2,
 		ulong, "", BitSizeRound - BitSize
@@ -43,7 +44,7 @@ struct Handle(Type_, size_t MaxCount_) {
 	// dfmt on
 
 	@property bool isValid() const {
-		return id < MaxCount;
+		return instantiate && id < MaxCount;
 	}
 
 	// I could dream
@@ -82,8 +83,8 @@ struct HandleRefData(HandleType_, Type) if (is(HandleType_ : Handle!(Type, MaxCo
 
 private:
 	this(HandleType* handle, Type* data) {
-		_handle.refGotten = cast(ubyte)(_handle.refGotten + 1);
 		_handle = handle;
+		_handle.refGotten = cast(ubyte)(_handle.refGotten + 1);
 		_data = data;
 	}
 
@@ -94,10 +95,14 @@ private:
 struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Handle!(Type, MaxCount), Type, size_t MaxCount)) {
 	private enum size_t MaxCount = HandleType.MaxCount;
 
+	@disable this(this);
+
 	HandleType[MaxCount] handles = () {
 		HandleType[MaxCount] output;
-		foreach (i, ref hdl; output)
+		foreach (i, ref hdl; output) {
+			hdl.instantiate = true;
 			hdl.id = i;
+		}
 		return output;
 	}();
 	Type[MaxCount] data;
@@ -117,8 +122,9 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 
 		auto handlePtr = find!"a.inUse == b"(handles[], false);
 		assert(!handlePtr.empty, "Out of handles!");
-		auto handle = &handlePtr.front;
+		HandleType* handle = &handlePtr.front;
 		handle.inUse = true;
+
 		handle.magic = cast(ubyte)(handle.magic + 1);
 
 		data[handle.id] = Type(args);
@@ -137,11 +143,11 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 	}
 
 	void clear() {
-		foreach (h; handles) {
+		foreach (ref h; handles) {
 			if (!h.inUse)
 				continue;
 			data[h.id].destroy;
-			handles[h.id].inUse = false;
+			h.inUse = false;
 		}
 	}
 

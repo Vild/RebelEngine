@@ -15,9 +15,11 @@ import rebel.social.discord;
 
 class TestState : IEngineState {
 	void enter(IEngineState oldState) {
+		_renderer = Engine.instance.renderer;
 		writeln(__FUNCTION__);
 		_createRenderpass();
 		_createShaderModules();
+		_createPipeline();
 	}
 
 	void update(float delta) {
@@ -29,56 +31,53 @@ class TestState : IEngineState {
 	}
 
 private:
+	IRenderer _renderer;
+
 	RenderPass _renderPass;
 	ShaderModule _vertexShaderModule, _fragmentShaderModule;
 
 	void _createRenderpass() {
-		IRenderer renderer = Engine.instance.renderer;
+		Attachment colorAttachment;
 		{
-			Attachment colorAttachment;
-			{
-				colorAttachment.format = ImageFormat.rgb888;
-				colorAttachment.samples = 1;
-				colorAttachment.loadOp = LoadOperation.clear;
-				colorAttachment.storeOp = StoreOperation.store;
-				colorAttachment.stencilLoadOp = LoadOperation.dontCare;
-				colorAttachment.stencilStoreOp = StoreOperation.dontCare;
-				colorAttachment.initialLayout = ImageLayout.undefined;
-				colorAttachment.finalLayout = ImageLayout.present;
-			}
-
-			Subpass subpass;
-			{
-				subpass.bindPoint = SubpassBindPoint.graphics;
-				subpass.colorOutput = [SubpassAttachment(&colorAttachment, ImageLayout.color)];
-			}
-
-			SubpassDependency dependency;
-			{
-				dependency.srcSubpass = externalSubpass;
-				dependency.dstSubpass = &subpass;
-				dependency.srcStageMask = StageFlags.colorOutput;
-				dependency.dstStageMask = StageFlags.colorOutput;
-				dependency.srcAccessMask = AccessMask.none;
-				dependency.dstAccessMask = AccessMask.readwrite;
-			}
-
-			RenderPassBuilder builder;
-			builder.isFinalScreenRenderPass = true;
-
-			builder.attachments = [&colorAttachment];
-			builder.subpasses = [&subpass];
-			builder.dependencies = [dependency];
-
-			_renderPass = renderer.construct(builder);
+			colorAttachment.imageTemplate = _renderer.framebufferImageTemplate;
+			colorAttachment.loadOp = LoadOperation.clear;
+			colorAttachment.storeOp = StoreOperation.store;
+			colorAttachment.stencilLoadOp = LoadOperation.dontCare;
+			colorAttachment.stencilStoreOp = StoreOperation.dontCare;
+			colorAttachment.initialLayout = ImageLayout.undefined;
+			colorAttachment.finalLayout = ImageLayout.present;
 		}
+
+		Subpass subpass;
+		{
+			subpass.bindPoint = SubpassBindPoint.graphics;
+			subpass.colorOutput = [SubpassAttachment(&colorAttachment, ImageLayout.color)];
+		}
+
+		SubpassDependency dependency;
+		{
+			dependency.srcSubpass = externalSubpass;
+			dependency.dstSubpass = &subpass;
+			dependency.srcStageMask = StageFlags.colorOutput;
+			dependency.dstStageMask = StageFlags.colorOutput;
+			dependency.srcAccessMask = AccessMask.none;
+			dependency.dstAccessMask = AccessMask.readwrite;
+		}
+
+		RenderPassBuilder builder;
+
+		builder.attachments = [&colorAttachment];
+		builder.subpasses = [&subpass];
+		builder.dependencies = [dependency];
+
+		_renderPass = _renderer.construct(builder);
+		_renderer.outputRenderPass = _renderPass;
 	}
 
 	void _createShaderModules() {
 		import std.file : readText;
 		import rebel.input.filesystem;
 
-		IRenderer renderer = Engine.instance.renderer;
 		FileSystem fs = Engine.instance.fileSystem;
 
 		{
@@ -91,7 +90,9 @@ private:
 			data.length = file.length;
 			file.read(data);
 			vertexBuilder.sourcecode = cast(string)data;
-			_vertexShaderModule = renderer.construct(vertexBuilder);
+			vertexBuilder.entrypoint = "main";
+			vertexBuilder.type = ShaderType.vertex;
+			_vertexShaderModule = _renderer.construct(vertexBuilder);
 		}
 
 		{
@@ -104,15 +105,19 @@ private:
 			data.length = file.length;
 			file.read(data);
 			fragmentBuilder.sourcecode = cast(string)data;
-			_fragmentShaderModule = renderer.construct(fragmentBuilder);
+			fragmentBuilder.entrypoint = "main";
+			fragmentBuilder.type = ShaderType.fragment;
+			_fragmentShaderModule = _renderer.construct(fragmentBuilder);
 		}
 	}
 
 	void _createPipeline() {
-		IRenderer renderer = Engine.instance.renderer;
 		IView view = Engine.instance.view;
 
 		PipelineBuilder builder;
+
+		builder.renderpass = _renderPass;
+
 		builder.shaderStages ~= _vertexShaderModule;
 		builder.shaderStages ~= _fragmentShaderModule;
 
@@ -137,8 +142,9 @@ private:
 		builder.blendState.logicOp = LogicOp.copy;
 		builder.blendState.blendConstants[] = 0;
 
-		renderer.construct(builder);
+		_renderer.construct(builder);
 	}
+
 }
 
 int main(string[] args) {
@@ -167,7 +173,7 @@ int main(string[] args) {
 	}*/
 
 	Engine e = Engine.instance;
-	scope (exit)
+	scope (success)
 		e.destroy;
 
 	enum Renderer : int {

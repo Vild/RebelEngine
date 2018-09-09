@@ -8,12 +8,7 @@ import rebel.handle;
 import erupted;
 import erupted.dispatch_device;
 
-import rebel.renderer.internal.vk.helper;
-import rebel.renderer.internal.vk.translate;
-import rebel.renderer.internal.vk.renderpass;
-import rebel.renderer.internal.vk.shadermodule;
-import rebel.renderer.internal.vk.pipeline;
-import rebel.renderer.internal.vk.device;
+import rebel.renderer.internal.vk;
 
 interface IVulkanView : IView {
 	@property PFN_vkGetInstanceProcAddr getVkGetInstanceProcAddr();
@@ -54,18 +49,16 @@ public:
 		_createInstance();
 		loadInstanceLevelFunctions(_instance);
 		_surface = view.createVulkanSurface(_instance);
-		_createVulkanPhysicalDevice();
-		_createVulkanLogicalDevice();
-		_createVulkanSwapChain();
-		_createVulkanImageViews();
-		//TODO: When can this be called
-		//_createFramebuffers();
+		_createDevice();
 	}
 
 	~this() {
-		// TODO: Fix crashes
 		_shaderModules.clear;
+		_pipelines.clear;
 		_renderPasses.clear;
+		_framebuffers.clear;
+		_images.clear;
+		_imageTemplates.clear;
 
 		_device.destroy;
 
@@ -81,28 +74,46 @@ public:
 	void finalize() {
 	}
 
-	RenderPass construct(ref RenderPassBuilder builder) {
-		return _renderPasses.create(builder, &_device);
+	// dfmt off
+	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(builder, &_device); }
+	Image construct(ref ImageBuilder builder) { return _images.create(builder, &_device); }
+	ImageTemplate construct(ref ImageTemplateBuilder builder) { return _imageTemplates.create(builder, &_device); }
+	Pipeline construct(ref PipelineBuilder builder) { return _pipelines.create(builder, &_device); }
+	RenderPass construct(ref RenderPassBuilder builder) { return _renderPasses.create(builder, &_device); }
+	ShaderModule construct(ref ShaderModuleBuilder builder) { return _shaderModules.create(builder, &_device); }
+
+	// Custom
+	Image construct(ref ImageBuilder builder, VkImage image) { return _images.create(builder, &_device, image); }
+
+	Framebuffer.Ref get(Framebuffer handler) { return _framebuffers.get(handler); }
+	Image.Ref get(Image handler) { return _images.get(handler); }
+	ImageTemplate.Ref get(ImageTemplate handler) { return _imageTemplates.get(handler); }
+	Pipeline.Ref get(Pipeline handler) { return _pipelines.get(handler); }
+	RenderPass.Ref get(RenderPass handler) { return _renderPasses.get(handler); }
+	ShaderModule.Ref get(ShaderModule handler) { return _shaderModules.get(handler); }
+
+	void destruct(Framebuffer handler) { return _framebuffers.remove(handler); }
+	void destruct(Image handler) { return _images.remove(handler); }
+	void destruct(ImageTemplate handler) { return _imageTemplates.remove(handler); }
+	void destruct(Pipeline handler) { return _pipelines.remove(handler); }
+	void destruct(RenderPass handler) { return _renderPasses.remove(handler); }
+	void destruct(ShaderModule handler) { return _shaderModules.remove(handler); }
+	// dfmt on
+
+	@property ImageTemplate framebufferImageTemplate() {
+		return _device.fbImageTemplate;
 	}
 
-	ShaderModule construct(ref ShaderModuleBuilder builder) {
-		return _shaderModules.create(builder, &_device);
+	@property void outputRenderPass(RenderPass renderpass) {
+		_device.outputRenderPass = renderpass;
 	}
 
-	Pipeline construct(ref PipelineBuilder builder) {
-		return _pipelines.create(builder, &_device);
+	@property Framebuffer[] outputFramebuffers() {
+		return _device.framebuffers;
 	}
 
-	RenderPass.Ref get(RenderPass handler) {
-		return _renderPasses.get(handler);
-	}
-
-	ShaderModule.Ref get(ShaderModule handler) {
-		return _shaderModules.get(handler);
-	}
-
-	Pipeline.Ref get(Pipeline handler) {
-		return _pipelines.get(handler);
+	@property size_t outputToIdx() {
+		return _device.nextFrameIdx;
 	}
 
 	@property RendererType renderType() const {
@@ -118,27 +129,33 @@ private:
 
 	VkSurfaceKHR _surface;
 
-	Device _device;
+	VKDevice _device;
 
-	HandleStorage!(RenderPass, VkRenderPassData) _renderPasses;
-	HandleStorage!(ShaderModule, VkShaderModuleData) _shaderModules;
-	HandleStorage!(Pipeline, VkPipelineData) _pipelines;
+	HandleStorage!(Framebuffer, VKFramebufferData) _framebuffers;
+	HandleStorage!(Image, VKImageData) _images;
+	HandleStorage!(ImageTemplate, VKImageTemplateData) _imageTemplates;
+	HandleStorage!(Pipeline, VKPipelineData) _pipelines;
+	HandleStorage!(RenderPass, VKRenderPassData) _renderPasses;
+	HandleStorage!(ShaderModule, VKShaderModuleData) _shaderModules;
 
 	void _recreate() {
+		import std.typecons : tuple;
+
 		_device.dispatch.DeviceWaitIdle();
+		_device.recreate();
+		//_createVulkanSwapChain();
+		//_createVulkanImageViews();
+		//_createFramebuffers();
 
-		_createVulkanSwapChain();
-		_createVulkanImageViews();
+		void recreate(T)(ref T storage) {
+			foreach (ref obj; storage) {
+				obj.cleanup();
+				obj.create();
+			}
+		}
 
-		foreach (ref VkRenderPassData renderPass; _renderPasses) {
-			renderPass.cleanup();
-			renderPass.create();
-		}
-		foreach (ref VkPipelineData pipeline; _pipelines) {
-			pipeline.cleanup();
-			pipeline.create();
-		}
-		_createFramebuffers();
+		recreate(_renderPasses);
+		recreate(_pipelines);
 		//createCommandBuffers();
 	}
 
@@ -188,7 +205,7 @@ private:
 		}
 	}
 
-	void _createVulkanPhysicalDevice() {
+	void _createDevice() {
 		bool isDeviceSuitable(VkPhysicalDevice device, ref QueueInformation qi, ref SwapChainInformation sci) {
 			{
 				// vkPhysicalDeviceProperties deviceProperties = device.getProperties();
@@ -228,184 +245,11 @@ private:
 			QueueInformation qi;
 			SwapChainInformation sci;
 			if (isDeviceSuitable(device, qi, sci)) { // TODO: Rank the GPUs
-				_device = Device(device, qi, sci);
+				_device.initialize(device, qi, sci, _surface);
 				return;
 			}
 		}
 
 		assert(0, "Failed to find suitable physical device!");
-	}
-
-	void _createVulkanLogicalDevice() {
-		float queuePriority = 1.0f;
-
-		// TODO: if queue index is same, only create one CreateInfo with count of two
-		// dfmt off
-		VkDeviceQueueCreateInfo[] queueCreateInfos = [
-			{ flags: VkDeviceQueueCreateFlagBits.VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT, queueFamilyIndex: _device.queueInfo.graphics, queueCount: 1, pQueuePriorities: &queuePriority },
-			{ flags: VkDeviceQueueCreateFlagBits.VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT, queueFamilyIndex: _device.queueInfo.present, queueCount: 1, pQueuePriorities: &queuePriority }
-		];
-		// dfmt on
-
-		const(char)*[] layers;
-		debug layers ~= "VK_LAYER_LUNARG_standard_validation";
-
-		const(char)*[] extensions = [VK_KHR_SWAPCHAIN_EXTENSION_NAME];
-
-		VkPhysicalDeviceFeatures2 deviceFeatures;
-		VkDeviceCreateInfo deviceCreateInfo;
-		deviceCreateInfo.pNext = &deviceFeatures;
-		deviceCreateInfo.queueCreateInfoCount = cast(uint)queueCreateInfos.length;
-		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfos[0];
-		deviceCreateInfo.enabledLayerCount = cast(uint)layers.length;
-		deviceCreateInfo.ppEnabledLayerNames = &layers[0];
-		deviceCreateInfo.enabledExtensionCount = cast(uint)extensions.length;
-		deviceCreateInfo.ppEnabledExtensionNames = &extensions[0];
-		deviceCreateInfo.pEnabledFeatures = null;
-
-		VkDevice tmpDevice;
-		vkAssert(vkCreateDevice(_device.device, &deviceCreateInfo, null, &tmpDevice), "Create device failed!");
-		_device.dispatch = DispatchDevice(tmpDevice);
-
-		VkDeviceQueueInfo2 queueInfo;
-		queueInfo.flags = VkDeviceQueueCreateFlagBits.VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT;
-		queueInfo.queueFamilyIndex = _device.queueInfo.graphics;
-		queueInfo.queueIndex = 0;
-
-		_device.dispatch.GetDeviceQueue2(&queueInfo, &_device.graphicsQueue);
-		assert(_device.graphicsQueue, "Graphic queue is null!");
-
-		queueInfo.queueFamilyIndex = _device.queueInfo.present;
-		_device.dispatch.GetDeviceQueue2(&queueInfo, &_device.presentQueue);
-		assert(_device.presentQueue, "Present queue is null!");
-
-	}
-
-	void _createVulkanSwapChain() {
-		VkSurfaceFormat2KHR surfaceFormat = (VkSurfaceFormat2KHR[] formats) {
-			if (formats.length == 1 && formats[0].surfaceFormat.format == VkFormat.VK_FORMAT_UNDEFINED) {
-				VkSurfaceFormat2KHR format;
-				format.surfaceFormat.format = VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
-				format.surfaceFormat.colorSpace = VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-				return format;
-			}
-
-			foreach (ref VkSurfaceFormat2KHR f; formats)
-				if (f.surfaceFormat.format == VkFormat.VK_FORMAT_B8G8R8A8_UNORM
-						&& f.surfaceFormat.colorSpace == VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-					return f;
-
-			return formats[0];
-		}(_device.swapChainInfo.formats);
-		_device.swapChainImageFormat = surfaceFormat;
-
-		VkPresentModeKHR presentMode = (VkPresentModeKHR[] presentModes) {
-			VkPresentModeKHR bestMode = VkPresentModeKHR.VK_PRESENT_MODE_FIFO_KHR;
-			foreach (VkPresentModeKHR pm; presentModes)
-				if (pm == VkPresentModeKHR.VK_PRESENT_MODE_MAILBOX_KHR)
-					return pm;
-				else if (pm == VkPresentModeKHR.VK_PRESENT_MODE_IMMEDIATE_KHR)
-					bestMode = pm;
-			return bestMode;
-		}(_device.swapChainInfo.presentModes);
-
-		VkExtent2D extent = (ref VkSurfaceCapabilitiesKHR capabilities) {
-			import std.algorithm : max, min;
-
-			if (capabilities.currentExtent.width != uint.max)
-				return capabilities.currentExtent;
-
-			VkExtent2D actualExtent = VkExtent2D(_view.size.x, _view.size.y);
-
-			actualExtent.width = max(capabilities.minImageExtent.width, min(capabilities.maxImageExtent.width, actualExtent.width));
-			actualExtent.height = max(capabilities.minImageExtent.height, min(capabilities.maxImageExtent.height, actualExtent.height));
-
-			return actualExtent;
-
-		}(_device.swapChainInfo.capabilities.surfaceCapabilities);
-		_device.swapChainExtent = extent;
-
-		uint imageCount = _device.swapChainInfo.capabilities.surfaceCapabilities.minImageCount + 1;
-		if (_device.swapChainInfo.capabilities.surfaceCapabilities.maxImageCount > 0
-				&& imageCount > _device.swapChainInfo.capabilities.surfaceCapabilities.maxImageCount)
-			imageCount = _device.swapChainInfo.capabilities.surfaceCapabilities.maxImageCount;
-
-		VkSwapchainCreateInfoKHR createInfo;
-		createInfo.surface = _surface;
-		createInfo.minImageCount = imageCount;
-		createInfo.imageFormat = surfaceFormat.surfaceFormat.format;
-		createInfo.imageColorSpace = surfaceFormat.surfaceFormat.colorSpace;
-		createInfo.imageExtent = extent;
-		createInfo.imageArrayLayers = 1;
-		createInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-		uint[] queueFamilyIndices = [_device.queueInfo.graphics, _device.queueInfo.present];
-
-		if (_device.queueInfo.graphics != _device.queueInfo.present) {
-			createInfo.imageSharingMode = VkSharingMode.VK_SHARING_MODE_CONCURRENT;
-			createInfo.queueFamilyIndexCount = 2;
-			createInfo.pQueueFamilyIndices = &queueFamilyIndices[0];
-		} else {
-			createInfo.imageSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
-			createInfo.queueFamilyIndexCount = 0; // Optional
-			createInfo.pQueueFamilyIndices = null; // Optional
-		}
-
-		createInfo.preTransform = _device.swapChainInfo.capabilities.surfaceCapabilities.currentTransform;
-		createInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-		createInfo.presentMode = presentMode;
-		createInfo.clipped = true;
-		createInfo.oldSwapchain = VkSwapchainKHR();
-
-		_device.dispatch.CreateSwapchainKHR(&createInfo, &_device.swapChain);
-		assert(_device.swapChain, "Create swapchain failed!");
-
-		_device.swapChainImages = getVKList(&_device.dispatch.GetSwapchainImagesKHR, _device.swapChain);
-	}
-
-	void _createVulkanImageViews() {
-		_device.swapChainImageViews.length = _device.swapChainImages.length;
-
-		foreach (i, image; _device.swapChainImages) {
-			VkImageViewCreateInfo createInfo;
-			createInfo.image = image;
-			createInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
-			createInfo.format = _device.swapChainImageFormat.surfaceFormat.format;
-			createInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-			createInfo.subresourceRange.baseMipLevel = 0;
-			createInfo.subresourceRange.levelCount = 1;
-			createInfo.subresourceRange.baseArrayLayer = 0;
-			createInfo.subresourceRange.layerCount = 1;
-			_device.dispatch.CreateImageView(&createInfo, &_device.swapChainImageViews[i]);
-		}
-	}
-
-	// TODO: Refactor into handle type!
-	void _createFramebuffers() {
-		_device.swapChainFramebuffers.length = _device.swapChainImageViews.length;
-
-		foreach (i, imageView; _device.swapChainImageViews) {
-			VkImageView[] attachments = [imageView];
-
-			VkFramebufferCreateInfo framebufferInfo;
-			foreach (VkRenderPassData renderPass; _renderPasses) {
-				if (renderPass.isFinalScreenRenderPass) {
-					framebufferInfo.renderPass = renderPass.renderPass;
-					break;
-				}
-			}
-			// TODO: what if framebufferInfo.renderPass is null
-			framebufferInfo.pAttachments = attachments.ptr;
-			framebufferInfo.attachmentCount = cast(uint)attachments.length;
-			framebufferInfo.width = _device.swapChainExtent.width;
-			framebufferInfo.height = _device.swapChainExtent.height;
-			framebufferInfo.layers = 1;
-
-			vkAssert(_device.dispatch.CreateFramebuffer(&framebufferInfo, &_device.swapChainFramebuffers[i]));
-		}
 	}
 }

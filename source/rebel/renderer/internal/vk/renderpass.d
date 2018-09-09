@@ -2,36 +2,38 @@ module rebel.renderer.internal.vk.renderpass;
 
 import rebel.renderer;
 import erupted;
+import rebel.engine;
 
-import rebel.renderer.internal.vk.device;
-import rebel.renderer.internal.vk.translate;
-import rebel.renderer.internal.vk.helper;
+import rebel.renderer.internal.vk;
 
-struct VkRenderPassData {
+struct VKRenderPassData {
 	RenderPassData base;
 	alias base this;
 
 	RenderPassBuilder builder;
-	bool isFinalScreenRenderPass;
+	VKDevice* device;
 
 	VkRenderPass renderPass;
-	Device* device;
 
-	this(ref RenderPassBuilder builder, Device* device) {
+	this(ref RenderPassBuilder builder, VKDevice* device) {
 		this.builder = builder;
-		isFinalScreenRenderPass = builder.isFinalScreenRenderPass;
 		this.device = device;
 		create();
 	}
 
 	void create() {
+		IRenderer renderer = Engine.instance.renderer;
+
 		VkAttachmentDescription[] attachments;
 		attachments.length = builder.attachments.length;
-		foreach (idx, const Attachment* attr; builder.attachments) {
+		foreach (idx, Attachment* attr; builder.attachments) {
 			VkAttachmentDescription* desc = &attachments[idx];
 
-			desc.format = attr.format.translate;
-			desc.samples = cast(VkSampleCountFlagBits)attr.samples;
+			scope ImageTemplate.Ref it = renderer.get(attr.imageTemplate);
+			auto data = it.get!VKImageTemplateData;
+
+			desc.format = data.format;
+			desc.samples = data.samples;
 			desc.loadOp = attr.loadOp.translate;
 			desc.storeOp = attr.storeOp.translate;
 			desc.stencilLoadOp = attr.stencilLoadOp.translate;
@@ -103,3 +105,5 @@ struct VkRenderPassData {
 		device.dispatch.DestroyRenderPass(renderPass);
 	}
 }
+
+static assert(isCorrectVulkanData!VKRenderPassData);

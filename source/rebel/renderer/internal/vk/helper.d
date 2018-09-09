@@ -22,7 +22,7 @@ template RemovePointer(T) {
 		static assert(0, "Not pointer!");
 }
 
-/// VkResult function(Object, uint*, T*)
+/// VkResult function(Objects..., uint*, T*)
 auto getVKList(Func, Objects...)(Func func, Objects objs) {
 	import std.traits : Parameters, ReturnType, Unqual;
 
@@ -45,6 +45,8 @@ auto getVKList(Func, Objects...)(Func func, Objects objs) {
 	return list;
 }
 
+
+/// VkResult function(uint*, T*)
 auto getVKList(Func)(Func func) {
 	import std.traits : Parameters, ReturnType, Unqual;
 
@@ -79,3 +81,6 @@ auto assumeNoGC(T)(T t) nothrow if (isFunctionPointer!T || isDelegate!T) {
 	enum attrs = functionAttributes!T | FunctionAttribute.nogc;
 	return cast(SetFunctionAttributes!(T, functionLinkage!T, attrs))t;
 }
+
+enum isCorrectVulkanData(T) = is(typeof((T t) => t.create())) && is(typeof((T t) => t.cleanup()))
+		&& is(typeof(T.tupleof[0]) == typeof(T.base));

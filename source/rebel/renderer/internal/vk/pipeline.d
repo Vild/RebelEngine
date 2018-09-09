@@ -4,22 +4,19 @@ import rebel.renderer;
 import erupted;
 import rebel.engine;
 
-import rebel.renderer.internal.vk.device;
-import rebel.renderer.internal.vk.helper;
-import rebel.renderer.internal.vk.translate;
-import rebel.renderer.internal.vk.shadermodule;
+import rebel.renderer.internal.vk;
 
-struct VkPipelineData {
+struct VKPipelineData {
 	PipelineData base;
 	alias base this;
 
 	PipelineBuilder builder;
-	Device* device;
+	VKDevice* device;
 
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 
-	this(ref PipelineBuilder builder, Device* device) {
+	this(ref PipelineBuilder builder, VKDevice* device) {
 		this.builder = builder;
 		this.device = device;
 		create();
@@ -31,7 +28,7 @@ struct VkPipelineData {
 
 		foreach (ShaderModule m; builder.shaderStages) {
 			scope ShaderModule.Ref shader = renderer.get(m);
-			shaderStages ~= shader.get!VkShaderModuleData().stageInfo;
+			shaderStages ~= shader.get!VKShaderModuleData().stageInfo;
 		}
 
 		VkVertexInputBindingDescription[] vertexInputBindingDescriptions;
@@ -87,6 +84,7 @@ struct VkPipelineData {
 		VkPipelineRasterizationStateCreateInfo rasterizer;
 		with (builder.rasterizationState) {
 			rasterizer.depthClampEnable = depthClampEnable;
+			rasterizer.depthBiasClamp = 0;
 			rasterizer.rasterizerDiscardEnable = rasterizerDiscardEnable;
 			rasterizer.polygonMode = polygonMode.translate;
 			rasterizer.lineWidth = lineWidth;
@@ -134,7 +132,7 @@ struct VkPipelineData {
 
 			RenderPass.Ref renderpass = renderer.get(builder.renderpass);
 
-			pipelineInfo.renderPass = renderpass.get!VkRenderPassData().renderPass;
+			pipelineInfo.renderPass = renderpass.get!VKRenderPassData().renderPass;
 		}
 		pipelineInfo.subpass = 0;
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -154,3 +152,5 @@ struct VkPipelineData {
 		device.dispatch.DestroyPipelineLayout(pipelineLayout);
 	}
 }
+
+static assert(isCorrectVulkanData!VKPipelineData);
