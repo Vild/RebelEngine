@@ -31,8 +31,10 @@ interface IRenderer {
 
 	// IPipelineBuilder newPipeline();
 	void newFrame();
+	void submit(CommandBuffer commandbuffer);
 	void finalize();
 
+	CommandBuffer construct(ref CommandBufferBuilder builder);
 	Framebuffer construct(ref FramebufferBuilder builder);
 	Image construct(ref ImageBuilder builder);
 	ImageTemplate construct(ref ImageTemplateBuilder builder);
@@ -40,6 +42,7 @@ interface IRenderer {
 	RenderPass construct(ref RenderPassBuilder builder);
 	ShaderModule construct(ref ShaderModuleBuilder builder);
 
+	CommandBuffer.Ref get(CommandBuffer handler);
 	Framebuffer.Ref get(Framebuffer handler);
 	Image.Ref get(Image handler);
 	ImageTemplate.Ref get(ImageTemplate handler);
@@ -47,6 +50,7 @@ interface IRenderer {
 	RenderPass.Ref get(RenderPass handler);
 	ShaderModule.Ref get(ShaderModule handler);
 
+	void destruct(CommandBuffer handler);
 	void destruct(Framebuffer handler);
 	void destruct(Image handler);
 	void destruct(ImageTemplate handler);
@@ -58,7 +62,7 @@ interface IRenderer {
 	@property void outputRenderPass(RenderPass renderpass);
 
 	@property Framebuffer[] outputFramebuffers();
-	@property size_t outputToIdx();
+	@property size_t outputIdx();
 
 	@property RendererType renderType() const;
 }

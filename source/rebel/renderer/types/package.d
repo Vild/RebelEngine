@@ -3,6 +3,7 @@ module rebel.renderer.types;
 public {
 	import rebel.handle;
 
+	import rebel.renderer.types.commandbuffer;
 	import rebel.renderer.types.framebuffer;
 	import rebel.renderer.types.image;
 	import rebel.renderer.types.imagetemplate;

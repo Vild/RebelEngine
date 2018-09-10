@@ -44,11 +44,13 @@ public:
 		glClearColor(0, 34.0f / 255, 34.0f / 255, 1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
+	void submit(CommandBuffer commandbuffer){}
 
 	void finalize() {
 	}
 
 	// dfmt off
+	CommandBuffer construct(ref CommandBufferBuilder builder) { return _commandBuffers.create(/*builder*/); }
 	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(/*builder*/); }
 	Image construct(ref ImageBuilder builder) { return _images.create(/*builder*/); }
 	ImageTemplate construct(ref ImageTemplateBuilder builder) { return _imageTemplates.create(/*builder*/); }
@@ -56,6 +58,7 @@ public:
 	RenderPass construct(ref RenderPassBuilder builder) { return _renderPasses.create(/*builder*/); }
 	ShaderModule construct(ref ShaderModuleBuilder builder) { return _shaderModules.create(/*builder*/); }
 
+	CommandBuffer.Ref get(CommandBuffer handler) { return _commandBuffers.get(handler); }
 	Framebuffer.Ref get(Framebuffer handler) { return _framebuffers.get(handler); }
 	Image.Ref get(Image handler) { return _images.get(handler); }
 	ImageTemplate.Ref get(ImageTemplate handler) { return _imageTemplates.get(handler); }
@@ -63,6 +66,7 @@ public:
 	RenderPass.Ref get(RenderPass handler) { return _renderPasses.get(handler); }
 	ShaderModule.Ref get(ShaderModule handler) { return _shaderModules.get(handler); }
 
+	void destruct(CommandBuffer handler) { return _commandBuffers.remove(handler); }
 	void destruct(Framebuffer handler) { return _framebuffers.remove(handler); }
 	void destruct(Image handler) { return _images.remove(handler); }
 	void destruct(ImageTemplate handler) { return _imageTemplates.remove(handler); }
@@ -82,7 +86,7 @@ public:
 		return [_outputFramebuffer];
 	}
 
-	@property size_t outputToIdx() {
+	@property size_t outputIdx() {
 		return 0;
 	}
 
@@ -99,6 +103,7 @@ private:
 	Version _gameVersion;
 	IVulkanView _view;
 
+	HandleStorage!(CommandBuffer, CommandBufferData) _commandBuffers;
 	HandleStorage!(Framebuffer, FramebufferData) _framebuffers;
 	HandleStorage!(Image, ImageData) _images;
 	HandleStorage!(ImageTemplate, ImageTemplateData) _imageTemplates;

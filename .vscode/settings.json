@@ -27,6 +27,8 @@
 		"hash_map": "cpp",
 		"*.tcc": "cpp",
 		"deque": "cpp",
-		"vector": "cpp"
+		"vector": "cpp",
+		"__config": "cpp",
+		"__nullptr": "cpp"
 	}
 }

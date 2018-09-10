@@ -16,14 +16,17 @@ import rebel.social.discord;
 class TestState : IEngineState {
 	void enter(IEngineState oldState) {
 		_renderer = Engine.instance.renderer;
+		_view = Engine.instance.view;
 		writeln(__FUNCTION__);
 		_createRenderpass();
 		_createShaderModules();
 		_createPipeline();
+		_createCommandBuffers();
 	}
 
 	void update(float delta) {
 		//writeln(__FUNCTION__);
+		_renderer.submit(_commandBuffers[_renderer.outputIdx]);
 	}
 
 	void exit(IEngineState newState) {
@@ -32,9 +35,13 @@ class TestState : IEngineState {
 
 private:
 	IRenderer _renderer;
+	IView _view;
 
 	RenderPass _renderPass;
 	ShaderModule _vertexShaderModule, _fragmentShaderModule;
+	Pipeline _pipeline;
+
+	CommandBuffer[] _commandBuffers;
 
 	void _createRenderpass() {
 		Attachment colorAttachment;
@@ -112,8 +119,6 @@ private:
 	}
 
 	void _createPipeline() {
-		IView view = Engine.instance.view;
-
 		PipelineBuilder builder;
 
 		builder.renderpass = _renderPass;
@@ -123,8 +128,8 @@ private:
 
 		builder.vertexTopology = VertexTopology.triangleList;
 
-		builder.viewports = [Viewport(vec2(0, 0), cast(vec2)view.size, vec2(0, 1))];
-		builder.scissors = [Scissor(ivec2(0, 0), uvec2(view.size))];
+		builder.viewports = [Viewport(vec2(0, 0), cast(vec2)_view.size, vec2(0, 1))];
+		builder.scissors = [Scissor(ivec2(0, 0), uvec2(_view.size))];
 
 		builder.rasterizationState.depthClampEnable = false;
 		builder.rasterizationState.rasterizerDiscardEnable = false;
@@ -142,7 +147,26 @@ private:
 		builder.blendState.logicOp = LogicOp.copy;
 		builder.blendState.blendConstants[] = 0;
 
-		_renderer.construct(builder);
+		_pipeline = _renderer.construct(builder);
+	}
+
+	void _createCommandBuffers() {
+		_commandBuffers.length = _renderer.outputFramebuffers.length;
+		foreach (i, Framebuffer fb; _renderer.outputFramebuffers) {
+			CommandBufferBuilder builder;
+			builder.callback = (ICommandBufferRecordingState rs) {
+				rs.renderPass = _renderPass;
+				rs.framebuffer = fb;
+				rs.pipeline = _pipeline;
+				rs.renderArea = uvec4(0, 0, _view.size.x, _view.size.y);
+				rs.clearColors = [vec4(34 / 255.0f, 0, 34 / 255.0f, 1.0f)];
+
+				rs.finalizeState();
+
+				rs.draw(3, 1, 0, 0);
+			};
+			_commandBuffers[i] = _renderer.construct(builder);
+		}
 	}
 
 }

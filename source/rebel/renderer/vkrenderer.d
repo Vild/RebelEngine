@@ -50,15 +50,23 @@ public:
 		loadInstanceLevelFunctions(_instance);
 		_surface = view.createVulkanSurface(_instance);
 		_createDevice();
+		_createSyncObjects();
 	}
 
 	~this() {
+		_commandBuffers.clear;
 		_shaderModules.clear;
 		_pipelines.clear;
 		_renderPasses.clear;
 		_framebuffers.clear;
 		_images.clear;
 		_imageTemplates.clear;
+
+		foreach (i; 0 .. _renderFinishedSemaphores.length) {
+			_device.dispatch.DestroySemaphore(_renderFinishedSemaphores[i]);
+			_device.dispatch.DestroySemaphore(_imageAvailableSemaphores[i]);
+			_device.dispatch.DestroyFence(_inFlightFences[i]);
+		}
 
 		_device.destroy;
 
@@ -69,12 +77,71 @@ public:
 	}
 
 	void newFrame() {
+		_device.dispatch.WaitForFences(1, &_inFlightFences[_currentFrame], true, size_t.max);
+
+		VkResult result = _device.dispatch.AcquireNextImageKHR(_device.swapChain, size_t.max,
+				_imageAvailableSemaphores[_currentFrame], VK_NULL_HANDLE, &_swapchainImageIndex);
+
+		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+			_recreate();
+			return newFrame();
+		} else
+			vkAssert(result);
+	}
+
+	void submit(CommandBuffer cb) {
+		CommandBuffer.Ref c = get(cb);
+		_submittedCommandBuffers ~= c.get!VKCommandBufferData().commandBuffer;
 	}
 
 	void finalize() {
+		VkSubmitInfo submitInfo;
+
+		VkSemaphore[] waitSemaphores = [_imageAvailableSemaphores[_currentFrame]];
+		VkPipelineStageFlags[] waitStages = [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT];
+		submitInfo.waitSemaphoreCount = cast(uint)waitSemaphores.length;
+		submitInfo.pWaitSemaphores = waitSemaphores.ptr;
+		submitInfo.waitSemaphoreCount = cast(uint)waitStages.length;
+		submitInfo.pWaitDstStageMask = waitStages.ptr;
+
+		submitInfo.commandBufferCount = cast(uint)_submittedCommandBuffers.length;
+		submitInfo.pCommandBuffers = _submittedCommandBuffers.ptr;
+
+		VkSemaphore[] signalSemaphores = [_renderFinishedSemaphores[_currentFrame]];
+		submitInfo.signalSemaphoreCount = cast(uint)signalSemaphores.length;
+		submitInfo.pSignalSemaphores = signalSemaphores.ptr;
+
+		vkAssert(_device.dispatch.ResetFences(1, &_inFlightFences[_currentFrame]));
+
+		vkAssert(_device.dispatch.vkQueueSubmit(_device.graphicsQueue, 1, &submitInfo, _inFlightFences[_currentFrame]));
+
+		// Clear submitted commandbuffers
+		_submittedCommandBuffers.length = 0;
+
+		VkPresentInfoKHR presentInfo;
+		presentInfo.waitSemaphoreCount = cast(uint)signalSemaphores.length;
+		presentInfo.pWaitSemaphores = signalSemaphores.ptr;
+
+		VkSwapchainKHR[] swapChains = [_device.swapChain];
+		presentInfo.swapchainCount = cast(uint)swapChains.length;
+		presentInfo.pSwapchains = swapChains.ptr;
+
+		presentInfo.pImageIndices = &_swapchainImageIndex;
+
+		VkResult result = _device.dispatch.vkQueuePresentKHR(_device.presentQueue, &presentInfo);
+
+		bool framebufferResized; // TODO: FIX THIS NOW
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+			framebufferResized = false;
+			_recreate();
+		} else
+			vkAssert(result);
+
+		_currentFrame = (_currentFrame + 1) % _imageAvailableSemaphores.length;
 	}
 
 	// dfmt off
+	CommandBuffer construct(ref CommandBufferBuilder builder) { return _commandBuffers.create(builder, &_device); }
 	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(builder, &_device); }
 	Image construct(ref ImageBuilder builder) { return _images.create(builder, &_device); }
 	ImageTemplate construct(ref ImageTemplateBuilder builder) { return _imageTemplates.create(builder, &_device); }
@@ -85,6 +152,7 @@ public:
 	// Custom
 	Image construct(ref ImageBuilder builder, VkImage image) { return _images.create(builder, &_device, image); }
 
+	CommandBuffer.Ref get(CommandBuffer handler) { return _commandBuffers.get(handler); }
 	Framebuffer.Ref get(Framebuffer handler) { return _framebuffers.get(handler); }
 	Image.Ref get(Image handler) { return _images.get(handler); }
 	ImageTemplate.Ref get(ImageTemplate handler) { return _imageTemplates.get(handler); }
@@ -92,6 +160,7 @@ public:
 	RenderPass.Ref get(RenderPass handler) { return _renderPasses.get(handler); }
 	ShaderModule.Ref get(ShaderModule handler) { return _shaderModules.get(handler); }
 
+	void destruct(CommandBuffer handler) { return _commandBuffers.remove(handler); }
 	void destruct(Framebuffer handler) { return _framebuffers.remove(handler); }
 	void destruct(Image handler) { return _images.remove(handler); }
 	void destruct(ImageTemplate handler) { return _imageTemplates.remove(handler); }
@@ -112,8 +181,8 @@ public:
 		return _device.framebuffers;
 	}
 
-	@property size_t outputToIdx() {
-		return _device.nextFrameIdx;
+	@property size_t outputIdx() {
+		return _currentFrame;
 	}
 
 	@property RendererType renderType() const {
@@ -131,6 +200,15 @@ private:
 
 	VKDevice _device;
 
+	VkSemaphore[] _imageAvailableSemaphores;
+	VkSemaphore[] _renderFinishedSemaphores;
+	VkFence[] _inFlightFences;
+	uint _currentFrame;
+	uint _swapchainImageIndex;
+
+	VkCommandBuffer[] _submittedCommandBuffers;
+
+	HandleStorage!(CommandBuffer, VKCommandBufferData) _commandBuffers;
 	HandleStorage!(Framebuffer, VKFramebufferData) _framebuffers;
 	HandleStorage!(Image, VKImageData) _images;
 	HandleStorage!(ImageTemplate, VKImageTemplateData) _imageTemplates;
@@ -141,7 +219,9 @@ private:
 	void _recreate() {
 		import std.typecons : tuple;
 
-		_device.dispatch.DeviceWaitIdle();
+		assert(0, "NOT allowed yet");
+
+		/+_device.dispatch.DeviceWaitIdle();
 		_device.recreate();
 		//_createVulkanSwapChain();
 		//_createVulkanImageViews();
@@ -156,7 +236,8 @@ private:
 
 		recreate(_renderPasses);
 		recreate(_pipelines);
-		//createCommandBuffers();
+		recreate(_commandBuffers);
+		//createCommandBuffers();+/
 	}
 
 	void _createInstance() {
@@ -185,8 +266,7 @@ private:
 		createInfo.pApplicationInfo = &appInfo;
 		const(char)*[] layers;
 		const(char)*[] extensions = _view.getRequiredVulkanInstanceExtensions();
-		extensions ~= "VK_KHR_get_surface_capabilities2";
-		extensions ~= "VK_KHR_get_physical_device_properties2";
+
 		debug extensions ~= VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
 		debug layers ~= "VK_LAYER_LUNARG_standard_validation";
 		createInfo.enabledLayerCount = cast(uint)layers.length;
@@ -209,19 +289,19 @@ private:
 		bool isDeviceSuitable(VkPhysicalDevice device, ref QueueInformation qi, ref SwapChainInformation sci) {
 			{
 				// vkPhysicalDeviceProperties deviceProperties = device.getProperties();
-				VkPhysicalDeviceFeatures2 deviceFeatures;
-				vkGetPhysicalDeviceFeatures2(device, &deviceFeatures);
+				VkPhysicalDeviceFeatures deviceFeatures;
+				vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-				if (!deviceFeatures.features.geometryShader)
+				if (!deviceFeatures.geometryShader)
 					return false;
-				VkQueueFamilyProperties2[] queueFamilies = getVKList(vkGetPhysicalDeviceQueueFamilyProperties2, device);
-				foreach (uint i, VkQueueFamilyProperties2 q; queueFamilies) {
+				VkQueueFamilyProperties[] queueFamilies = getVKList(vkGetPhysicalDeviceQueueFamilyProperties, device);
+				foreach (uint i, VkQueueFamilyProperties q; queueFamilies) {
 					// TODO: Rate queues
 					VkBool32 hasPresent;
 					vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _surface, &hasPresent);
-					if (!q.queueFamilyProperties.queueCount)
+					if (!q.queueCount)
 						continue;
-					if (q.queueFamilyProperties.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT)
+					if (q.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT)
 						qi.graphics = i;
 					if (hasPresent)
 						qi.present = i;
@@ -229,12 +309,8 @@ private:
 			}
 
 			{
-				// dfmt off
-				VkPhysicalDeviceSurfaceInfo2KHR info = {surface: _surface};
-				// dfmt on
-
-				vkGetPhysicalDeviceSurfaceCapabilities2KHR(device, &info, &sci.capabilities);
-				sci.formats = getVKList(vkGetPhysicalDeviceSurfaceFormats2KHR, device, &info);
+				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, _surface, &sci.capabilities);
+				sci.formats = getVKList(vkGetPhysicalDeviceSurfaceFormatsKHR, device, _surface);
 				sci.presentModes = getVKList(vkGetPhysicalDeviceSurfacePresentModesKHR, device, _surface);
 			}
 
@@ -251,5 +327,22 @@ private:
 		}
 
 		assert(0, "Failed to find suitable physical device!");
+	}
+
+	void _createSyncObjects() {
+		enum maxFramesInFlight = 2;
+		_imageAvailableSemaphores.length = maxFramesInFlight;
+		_renderFinishedSemaphores.length = maxFramesInFlight;
+		_inFlightFences.length = maxFramesInFlight;
+
+		VkSemaphoreCreateInfo semaphoreInfo;
+		VkFenceCreateInfo fenceInfo;
+		fenceInfo.flags = VkFenceCreateFlagBits.VK_FENCE_CREATE_SIGNALED_BIT;
+
+		foreach (i; 0 .. maxFramesInFlight) {
+			vkAssert(_device.dispatch.CreateSemaphore(&semaphoreInfo, &_imageAvailableSemaphores[i]));
+			vkAssert(_device.dispatch.CreateSemaphore(&semaphoreInfo, &_renderFinishedSemaphores[i]));
+			vkAssert(_device.dispatch.CreateFence(&fenceInfo, &_inFlightFences[i]));
+		}
 	}
 }

@@ -20,14 +20,14 @@ struct QueueInformation {
 }
 
 struct SwapChainInformation {
-	VkSurfaceCapabilities2KHR capabilities;
-	VkSurfaceFormat2KHR[] formats;
+	VkSurfaceCapabilitiesKHR capabilities;
+	VkSurfaceFormatKHR[] formats;
 	VkPresentModeKHR[] presentModes;
 }
 
 struct VKDevice {
 	VKRenderer renderer;
-	IView view;
+	IVulkanView view;
 
 	// Physical device
 	VkPhysicalDevice device;
@@ -35,10 +35,10 @@ struct VKDevice {
 	SwapChainInformation swapChainInfo;
 	VkSurfaceKHR surface;
 
-	VkPhysicalDeviceProperties2 physicalProperties;
-	VkPhysicalDeviceFeatures2 physicalFeatures;
-	VkPhysicalDeviceMemoryProperties2 physicalMemoryProperties;
-	VkQueueFamilyProperties2[] physicalQueueFamilyProperties;
+	VkPhysicalDeviceProperties physicalProperties;
+	VkPhysicalDeviceFeatures physicalFeatures;
+	VkPhysicalDeviceMemoryProperties physicalMemoryProperties;
+	VkQueueFamilyProperties[] physicalQueueFamilyProperties;
 	string[] physicalSupportedExtensions;
 
 	// Logical device
@@ -47,7 +47,7 @@ struct VKDevice {
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
 
-	VkSurfaceFormat2KHR swapChainImageFormat;
+	VkSurfaceFormatKHR swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 	VkSwapchainKHR swapChain;
 	VkImage[] swapChainImages;
@@ -56,26 +56,26 @@ struct VKDevice {
 	Image[] fbImages;
 	RenderPass fbRenderPass;
 	Framebuffer[] framebuffers;
-	size_t nextFrameIdx;
 
-	VkDescriptorPool descriptorPool;
+	VkCommandPool defaultCommandPool;
+	VkCommandPool changeEachFrameCommandPool;
 
 	void initialize(VkPhysicalDevice device, QueueInformation queueInfo, SwapChainInformation swapChainInfo, VkSurfaceKHR surface) {
 		import std.string : fromStringz;
 
 		renderer = cast(VKRenderer)Engine.instance.renderer;
-		view = Engine.instance.view;
+		view = cast(IVulkanView)Engine.instance.view;
 
 		this.device = device;
 		this.queueInfo = queueInfo;
 		this.swapChainInfo = swapChainInfo;
 		this.surface = surface;
 
-		vkGetPhysicalDeviceProperties2(device, &physicalProperties);
-		vkGetPhysicalDeviceFeatures2(device, &physicalFeatures);
-		vkGetPhysicalDeviceMemoryProperties2(device, &physicalMemoryProperties);
+		vkGetPhysicalDeviceProperties(device, &physicalProperties);
+		vkGetPhysicalDeviceFeatures(device, &physicalFeatures);
+		vkGetPhysicalDeviceMemoryProperties(device, &physicalMemoryProperties);
 
-		physicalQueueFamilyProperties = getVKList(vkGetPhysicalDeviceQueueFamilyProperties2, device);
+		physicalQueueFamilyProperties = getVKList(vkGetPhysicalDeviceQueueFamilyProperties, device);
 
 		auto extensions = getVKList(vkEnumerateDeviceExtensionProperties, device, null);
 		physicalSupportedExtensions.length = extensions.length;
@@ -86,11 +86,15 @@ struct VKDevice {
 		_createLogicalDevice();
 		_createSwapChain();
 		_createImageViews();
+		_createCommandPools();
 	}
 
 	~this() {
 		if (device == VK_NULL_HANDLE) // On opAssign or when the GC, for some reason, calls this destructor
 			return;
+
+		dispatch.DestroyCommandPool(changeEachFrameCommandPool);
+		dispatch.DestroyCommandPool(defaultCommandPool);
 
 		/*foreach (Framebuffer fb; framebuffers)
 			renderer.destruct(fb);
@@ -114,9 +118,9 @@ struct VKDevice {
 	}
 
 	uint getMemoryType(uint typeBits, VkMemoryPropertyFlags properties, bool* foundIt = null) {
-		foreach (i; 0 .. physicalMemoryProperties.memoryProperties.memoryTypeCount) {
+		foreach (i; 0 .. physicalMemoryProperties.memoryTypeCount) {
 			if (typeBits & 0b1)
-				if ((physicalMemoryProperties.memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+				if ((physicalMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
 					if (foundIt)
 						*foundIt = true;
 					return i;
@@ -141,56 +145,47 @@ private:
 		// TODO: if queue index is same, only create one CreateInfo with count of two
 		// dfmt off
 		VkDeviceQueueCreateInfo[] queueCreateInfos = [
-			{ flags: VkDeviceQueueCreateFlagBits.VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT, queueFamilyIndex: queueInfo.graphics, queueCount: 1, pQueuePriorities: &queuePriority },
-			{ flags: VkDeviceQueueCreateFlagBits.VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT, queueFamilyIndex: queueInfo.present, queueCount: 1, pQueuePriorities: &queuePriority }
+			{ queueFamilyIndex: queueInfo.graphics, queueCount: 1, pQueuePriorities: &queuePriority },
+			{ queueFamilyIndex: queueInfo.present, queueCount: 1, pQueuePriorities: &queuePriority }
 		];
 		// dfmt on
 
 		const(char)*[] layers;
 		debug layers ~= "VK_LAYER_LUNARG_standard_validation";
-
 		const(char)*[] extensions = [VK_KHR_SWAPCHAIN_EXTENSION_NAME];
 
-		VkPhysicalDeviceFeatures2 deviceFeatures;
+		VkPhysicalDeviceFeatures deviceFeatures;
 		VkDeviceCreateInfo deviceCreateInfo;
-		deviceCreateInfo.pNext = &deviceFeatures;
 		deviceCreateInfo.queueCreateInfoCount = cast(uint)queueCreateInfos.length;
 		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfos[0];
 		deviceCreateInfo.enabledLayerCount = cast(uint)layers.length;
 		deviceCreateInfo.ppEnabledLayerNames = &layers[0];
 		deviceCreateInfo.enabledExtensionCount = cast(uint)extensions.length;
 		deviceCreateInfo.ppEnabledExtensionNames = &extensions[0];
-		deviceCreateInfo.pEnabledFeatures = null;
+		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
 		VkDevice tmpDevice;
 		vkAssert(vkCreateDevice(device, &deviceCreateInfo, null, &tmpDevice), "Create device failed!");
 		dispatch = DispatchDevice(tmpDevice);
 
-		VkDeviceQueueInfo2 deviceQueueInfo;
-		deviceQueueInfo.flags = VkDeviceQueueCreateFlagBits.VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT;
-		deviceQueueInfo.queueFamilyIndex = queueInfo.graphics;
-		deviceQueueInfo.queueIndex = 0;
-
-		dispatch.GetDeviceQueue2(&deviceQueueInfo, &graphicsQueue);
+		dispatch.GetDeviceQueue(queueInfo.graphics, 0, &graphicsQueue);
 		assert(graphicsQueue, "Graphic queue is null!");
 
-		deviceQueueInfo.queueFamilyIndex = queueInfo.present;
-		dispatch.GetDeviceQueue2(&deviceQueueInfo, &presentQueue);
+		dispatch.GetDeviceQueue(queueInfo.present, 0, &presentQueue);
 		assert(presentQueue, "Present queue is null!");
 	}
 
 	void _createSwapChain() {
-		VkSurfaceFormat2KHR surfaceFormat = (VkSurfaceFormat2KHR[] formats) {
-			if (formats.length == 1 && formats[0].surfaceFormat.format == VkFormat.VK_FORMAT_UNDEFINED) {
-				VkSurfaceFormat2KHR format;
-				format.surfaceFormat.format = VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
-				format.surfaceFormat.colorSpace = VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+		VkSurfaceFormatKHR surfaceFormat = (VkSurfaceFormatKHR[] formats) {
+			if (formats.length == 1 && formats[0].format == VkFormat.VK_FORMAT_UNDEFINED) {
+				VkSurfaceFormatKHR format;
+				format.format = VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
+				format.colorSpace = VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 				return format;
 			}
 
-			foreach (ref VkSurfaceFormat2KHR f; formats)
-				if (f.surfaceFormat.format == VkFormat.VK_FORMAT_B8G8R8A8_UNORM
-						&& f.surfaceFormat.colorSpace == VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			foreach (ref VkSurfaceFormatKHR f; formats)
+				if (f.format == VkFormat.VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 					return f;
 
 			return formats[0];
@@ -220,17 +215,16 @@ private:
 
 			return actualExtent;
 
-		}(swapChainInfo.capabilities.surfaceCapabilities);
+		}(swapChainInfo.capabilities);
 		swapChainExtent = extent;
 
-		uint imageCount = swapChainInfo.capabilities.surfaceCapabilities.minImageCount + 1;
-		if (swapChainInfo.capabilities.surfaceCapabilities.maxImageCount > 0
-				&& imageCount > swapChainInfo.capabilities.surfaceCapabilities.maxImageCount)
-			imageCount = swapChainInfo.capabilities.surfaceCapabilities.maxImageCount;
+		uint imageCount = swapChainInfo.capabilities.minImageCount + 1;
+		if (swapChainInfo.capabilities.maxImageCount > 0 && imageCount > swapChainInfo.capabilities.maxImageCount)
+			imageCount = swapChainInfo.capabilities.maxImageCount;
 
 		{
 			ImageTemplateBuilder builder;
-			builder.format = swapChainImageFormat.surfaceFormat.format.translate;
+			builder.format = swapChainImageFormat.format.translate;
 			builder.samples = 1;
 			builder.size = uvec2(swapChainExtent.width, swapChainExtent.height);
 			builder.usage = ImageUsage.presentAttachment;
@@ -241,8 +235,8 @@ private:
 		VkSwapchainCreateInfoKHR createInfo;
 		createInfo.surface = surface;
 		createInfo.minImageCount = imageCount;
-		createInfo.imageFormat = surfaceFormat.surfaceFormat.format;
-		createInfo.imageColorSpace = surfaceFormat.surfaceFormat.colorSpace;
+		createInfo.imageFormat = surfaceFormat.format;
+		createInfo.imageColorSpace = surfaceFormat.colorSpace;
 		createInfo.imageExtent = extent;
 		createInfo.imageArrayLayers = 1;
 		createInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -259,7 +253,7 @@ private:
 			createInfo.pQueueFamilyIndices = null; // Optional
 		}
 
-		createInfo.preTransform = swapChainInfo.capabilities.surfaceCapabilities.currentTransform;
+		createInfo.preTransform = swapChainInfo.capabilities.currentTransform;
 		createInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		createInfo.presentMode = presentMode;
 		createInfo.clipped = true;
@@ -283,7 +277,7 @@ private:
 		/*VkImageViewCreateInfo createInfo;
 			createInfo.image = image;
 			createInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
-			createInfo.format = swapChainImageFormat.surfaceFormat.format;
+			createInfo.format = swapChainImageFormat.format;
 			createInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
 			createInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
 			createInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -307,5 +301,16 @@ private:
 			builder.renderPass = fbRenderPass;
 			framebuffers[i] = renderer.construct(builder);
 		}
+	}
+
+	void _createCommandPools() {
+		VkCommandPoolCreateInfo poolInfo;
+		poolInfo.queueFamilyIndex = queueInfo.graphics;
+
+		poolInfo.flags = VkCommandPoolCreateFlagBits.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		vkAssert(dispatch.CreateCommandPool(&poolInfo, &defaultCommandPool));
+
+		poolInfo.flags |= VkCommandPoolCreateFlagBits.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+		vkAssert(dispatch.CreateCommandPool(&poolInfo, &changeEachFrameCommandPool));
 	}
 }

@@ -14,7 +14,7 @@ struct VKPipelineData {
 	VKDevice* device;
 
 	VkPipelineLayout pipelineLayout;
-	VkPipeline graphicsPipeline;
+	VkPipeline pipeline;
 
 	this(ref PipelineBuilder builder, VKDevice* device) {
 		this.builder = builder;
@@ -137,7 +137,7 @@ struct VKPipelineData {
 		pipelineInfo.subpass = 0;
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-		vkAssert(device.dispatch.CreateGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, &graphicsPipeline));
+		vkAssert(device.dispatch.CreateGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, &pipeline));
 	}
 
 	~this() {
@@ -148,7 +148,7 @@ struct VKPipelineData {
 	}
 
 	void cleanup() {
-		device.dispatch.DestroyPipeline(graphicsPipeline);
+		device.dispatch.DestroyPipeline(pipeline);
 		device.dispatch.DestroyPipelineLayout(pipelineLayout);
 	}
 }

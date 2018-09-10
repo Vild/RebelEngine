@@ -7,7 +7,7 @@ import erupted;
 
 import rebel.renderer.internal.vk;
 
-struct Vk__TEMPLATE__Data {
+struct VK__TEMPLATE__Data {
 	__TEMPLATE__Data base;
 	alias base this;
 
@@ -20,7 +20,7 @@ struct Vk__TEMPLATE__Data {
 		create();
 	}
 
-	void recreate() {
+	void create() {
 	}
 
 	~this() {
