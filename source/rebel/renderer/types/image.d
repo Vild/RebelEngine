@@ -4,6 +4,7 @@ import rebel.renderer.types;
 import dlsl.vector;
 
 struct ImageBuilder {
+	string name;
 	ImageTemplate imageTemplate;
 }
 

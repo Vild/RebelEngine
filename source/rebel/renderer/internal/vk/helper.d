@@ -3,6 +3,9 @@ module rebel.renderer.internal.vk.helper;
 import erupted;
 import erupted.dispatch_device;
 
+import rebel.renderer.vkrenderer;
+import rebel.renderer.internal.vk;
+
 package(rebel.renderer):
 void vkAssert(Args...)(VkResult result, Args args) {
 	import std.stdio : stderr;
@@ -45,7 +48,6 @@ auto getVKList(Func, Objects...)(Func func, Objects objs) {
 	return list;
 }
 
-
 /// VkResult function(uint*, T*)
 auto getVKList(Func)(Func func) {
 	import std.traits : Parameters, ReturnType, Unqual;
@@ -60,20 +62,6 @@ auto getVKList(Func)(Func func) {
 	return list;
 }
 
-static VkResult CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
-		const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback) {
-	auto func = cast(PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-	if (func)
-		return func(instance, pCreateInfo, pAllocator, pCallback);
-	else
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-}
-
-static void DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator) {
-	auto func = cast(PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
-	if (func)
-		func(instance, callback, pAllocator);
-}
 // Casts @nogc out of a function or delegate type.
 import std.traits;
 
@@ -84,3 +72,14 @@ auto assumeNoGC(T)(T t) nothrow if (isFunctionPointer!T || isDelegate!T) {
 
 enum isCorrectVulkanData(T) = is(typeof((T t) => t.create())) && is(typeof((T t) => t.cleanup()))
 		&& is(typeof(T.tupleof[0]) == typeof(T.base));
+
+void setVkObjectName(T)(VKDevice* device, VkObjectType type, T* handle, string name) {
+	import std.string : toStringz;
+
+	VkDebugUtilsObjectNameInfoEXT nameInfo;
+	nameInfo.objectType = type;
+	nameInfo.objectHandle = cast(ulong)handle;
+	nameInfo.pObjectName = name.toStringz;
+
+	vkAssert(device.dispatch.SetDebugUtilsObjectNameEXT(&nameInfo));
+}

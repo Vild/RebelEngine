@@ -92,6 +92,8 @@ struct VKRenderPassData {
 		renderPassInfo.dependencyCount = cast(uint)dependencies.length;
 
 		vkAssert(device.dispatch.CreateRenderPass(&renderPassInfo, &renderPass));
+
+		setVkObjectName(device, VK_OBJECT_TYPE_RENDER_PASS, renderPass, builder.name);
 	}
 
 	~this() {

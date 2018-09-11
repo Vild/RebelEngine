@@ -61,6 +61,8 @@ struct SubpassDependency {
 }
 
 struct RenderPassBuilder {
+	string name;
+
 	Attachment*[] attachments;
 
 	Subpass*[] subpasses;

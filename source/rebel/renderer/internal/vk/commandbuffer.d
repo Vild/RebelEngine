@@ -118,6 +118,8 @@ struct VKCommandBufferData {
 		beginInfo.flags = VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 		vkAssert(device.dispatch.vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
+		setVkObjectName(device, VK_OBJECT_TYPE_COMMAND_BUFFER, commandBuffer, builder.name);
+
 		builder.callback(recordingState);
 
 		device.dispatch.vkCmdEndRenderPass(commandBuffer);

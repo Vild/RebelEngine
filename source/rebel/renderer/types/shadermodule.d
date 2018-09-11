@@ -8,6 +8,8 @@ enum ShaderType {
 }
 
 struct ShaderModuleBuilder {
+	string name;
+
 	string sourcecode;
 	string entrypoint;
 	ShaderType type;

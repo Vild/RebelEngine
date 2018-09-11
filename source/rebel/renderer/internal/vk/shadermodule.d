@@ -29,9 +29,10 @@ struct VKShaderModuleData {
 		createinfo.codeSize = builder.sourcecode.length;
 
 		vkAssert(device.dispatch.CreateShaderModule(&createinfo, &shaderModule));
+		setVkObjectName(device, VK_OBJECT_TYPE_SHADER_MODULE, shaderModule, builder.name);
 
 		stageInfo._module = shaderModule;
-		stageInfo.pName = "main";//builder.entrypoint.toStringz;
+		stageInfo.pName = builder.entrypoint.toStringz;
 		stageInfo.stage = builder.type.translate;
 	}
 

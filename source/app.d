@@ -72,7 +72,7 @@ private:
 		}
 
 		RenderPassBuilder builder;
-
+		builder.name = "Main RenderPass";
 		builder.attachments = [&colorAttachment];
 		builder.subpasses = [&subpass];
 		builder.dependencies = [dependency];
@@ -96,6 +96,8 @@ private:
 				data.destroy;
 			data.length = file.length;
 			file.read(data);
+
+			vertexBuilder.name = "vktest/vert.spv";
 			vertexBuilder.sourcecode = cast(string)data;
 			vertexBuilder.entrypoint = "main";
 			vertexBuilder.type = ShaderType.vertex;
@@ -111,6 +113,8 @@ private:
 				data.destroy;
 			data.length = file.length;
 			file.read(data);
+
+			fragmentBuilder.name = "vktest/frag.spv";
 			fragmentBuilder.sourcecode = cast(string)data;
 			fragmentBuilder.entrypoint = "main";
 			fragmentBuilder.type = ShaderType.fragment;
@@ -120,7 +124,7 @@ private:
 
 	void _createPipeline() {
 		PipelineBuilder builder;
-
+		builder.name = "Main Pipeline";
 		builder.renderpass = _renderPass;
 
 		builder.shaderStages ~= _vertexShaderModule;
@@ -153,7 +157,9 @@ private:
 	void _createCommandBuffers() {
 		_commandBuffers.length = _renderer.outputFramebuffers.length;
 		foreach (i, Framebuffer fb; _renderer.outputFramebuffers) {
+			import std.format : format;
 			CommandBufferBuilder builder;
+			builder.name = format("Main commandbuffer - Framebuffer #%d", i);
 			builder.callback = (ICommandBufferRecordingState rs) {
 				rs.renderPass = _renderPass;
 				rs.framebuffer = fb;

@@ -114,6 +114,7 @@ struct VKPipelineData {
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo;
 		vkAssert(device.dispatch.CreatePipelineLayout(&pipelineLayoutInfo, &pipelineLayout));
+		setVkObjectName(device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, pipelineLayout, builder.name);
 
 		VkGraphicsPipelineCreateInfo pipelineInfo;
 		pipelineInfo.pStages = shaderStages.ptr;
@@ -138,6 +139,7 @@ struct VKPipelineData {
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
 		vkAssert(device.dispatch.CreateGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, &pipeline));
+		setVkObjectName(device, VK_OBJECT_TYPE_PIPELINE, pipeline, builder.name);
 	}
 
 	~this() {

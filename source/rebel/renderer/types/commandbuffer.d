@@ -18,6 +18,7 @@ interface ICommandBufferRecordingState {
 alias CommandBufferCreateCallback = void delegate(ICommandBufferRecordingState recordingState);
 
 struct CommandBufferBuilder {
+	string name;
 	CommandBufferCreateCallback callback;
 	bool willChangeEachFrame;
 }

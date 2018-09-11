@@ -45,6 +45,7 @@ struct VKImageData {
 			imageCreate.usage = data.usage | VK_IMAGE_USAGE_SAMPLED_BIT;
 
 			vkAssert(device.dispatch.CreateImage(&imageCreate, &image));
+			setVkObjectName(device, VK_OBJECT_TYPE_IMAGE, image, builder.name);
 
 			VkMemoryRequirements memReqs;
 			device.dispatch.GetImageMemoryRequirements(image, &memReqs);
@@ -54,6 +55,8 @@ struct VKImageData {
 			memAlloc.memoryTypeIndex = device.getMemoryType(memReqs.memoryTypeBits, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			vkAssert(device.dispatch.AllocateMemory(&memAlloc, &memory));
 			vkAssert(device.dispatch.BindImageMemory(image, memory, 0));
+
+			setVkObjectName(device, VK_OBJECT_TYPE_DEVICE_MEMORY, memory, builder.name);
 		}
 
 		VkImageViewCreateInfo createinfo;
@@ -71,6 +74,7 @@ struct VKImageData {
 		createinfo.subresourceRange.layerCount = 1;
 		createinfo.image = image;
 		vkAssert(device.dispatch.CreateImageView(&createinfo, &view));
+		setVkObjectName(device, VK_OBJECT_TYPE_IMAGE_VIEW, view, builder.name);
 	}
 
 	~this() {

@@ -20,14 +20,67 @@ interface IVulkanView : IView {
 interface IVulkanRenderer : IRenderer {
 }
 
-extern (C) static VkBool32 vulkanDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, ulong obj,
-		size_t location, int code, const char* layerPrefix, const char* msg, void* userData) nothrow {
-
-	import std.stdio : stderr, fprintf;
+extern (C) static VkBool32 vulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+		VkDebugUtilsMessageTypeFlagsEXT messageType, const(VkDebugUtilsMessengerCallbackDataEXT)* pCallbackData, void* pUserData) nothrow {
+	import std.stdio : stderr;
 	import std.string : fromStringz;
+	import std.algorithm : map, predSwitch;
+
+	// dfmt off
+	alias getColor = (VkDebugUtilsMessageSeverityFlagBitsEXT s) => s.predSwitch(
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT, "97", // Bright white
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT, "96", // Bright cyan
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT, "93", // Bright yellow
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT, "91", // Bright red
+		""
+	);
+	alias getStyle = (VkDebugUtilsMessageTypeFlagsEXT s) => (cast(VkDebugUtilsMessageTypeFlagBitsEXT)s).predSwitch(
+		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT, ";5",
+		""
+	);
+	alias getSeverity = (VkDebugUtilsMessageSeverityFlagBitsEXT s) => s.predSwitch(
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT, "Verbose",
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT, "Info",
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT, "Warning",
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT, "Error",
+		"<UNKNOWN>"
+	);
+	alias getType = (VkDebugUtilsMessageTypeFlagsEXT s) => (cast(VkDebugUtilsMessageTypeFlagBitsEXT)s).predSwitch(
+		VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT, "General",
+		VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT, "SPEC | PERF",
+		VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT, "SPEC",
+		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT, "PERF",
+		""
+	);
+	// dfmt on
 
 	try {
-		stderr.writefln("Validation layer: %s", msg.fromStringz);
+		stderr.writefln("\x1b[%s%sm[S:%s][T:%s] ID: %d, Name: %s\x1b[0m", getColor(messageSeverity), getStyle(messageType),
+				getSeverity(messageSeverity), getType(messageType), pCallbackData.messageIdNumber, pCallbackData.pMessageIdName.fromStringz);
+
+		const(VkDebugUtilsObjectNameInfoEXT)[] objects = pCallbackData.pObjects[0 .. pCallbackData.objectCount];
+		if (objects) {
+			stderr.writefln("Objects - Amount: %d:", objects.length);
+			foreach (idx, ref obj; objects)
+				stderr.writefln("\tObject[%d] - Type: %s, Value: 0x%X, Name: \"%s\"", idx, obj.objectType, obj.objectHandle,
+						obj.pObjectName.fromStringz);
+		}
+
+		const(VkDebugUtilsLabelEXT)[] cmdBufLabels = pCallbackData.pCmdBufLabels[0 .. pCallbackData.cmdBufLabelCount];
+		if (cmdBufLabels) {
+			stderr.writefln("CommandBuffer Labels - Amount: %d:", cmdBufLabels.length);
+			foreach (idx, ref label; cmdBufLabels)
+				stderr.writefln("\tLable[%d]: - %s {%(%f%|, %)}", idx, label.pLabelName.fromStringz, label.color);
+		}
+
+		const(VkDebugUtilsLabelEXT)[] queueLabels = pCallbackData.pQueueLabels[0 .. pCallbackData.queueLabelCount];
+		if (queueLabels) {
+			stderr.writefln("Queue Labels - Amount: %d:", queueLabels.length);
+			foreach (idx, ref label; queueLabels)
+				stderr.writefln("\tLable[%d]: - %s {%(%f%|, %)}", idx, label.pLabelName.fromStringz, label.color);
+		}
+
+		stderr.writefln("Message:\n\t%s", pCallbackData.pMessage.fromStringz);
 	} catch (Exception) {
 	}
 
@@ -45,15 +98,15 @@ public:
 		auto view = cast(IVulkanView)view_;
 		assert(view);
 		_view = view;
-		loadGlobalLevelFunctions(view.getVkGetInstanceProcAddr);
 		_createInstance();
-		loadInstanceLevelFunctions(_instance);
 		_surface = view.createVulkanSurface(_instance);
 		_createDevice();
 		_createSyncObjects();
 	}
 
 	~this() {
+		_device.dispatch.DeviceWaitIdle();
+
 		_commandBuffers.clear;
 		_shaderModules.clear;
 		_pipelines.clear;
@@ -70,7 +123,7 @@ public:
 
 		_device.destroy;
 
-		debug DestroyDebugReportCallbackEXT(_instance, _debugCallback, null);
+		debug vkDestroyDebugUtilsMessengerEXT(_instance, _debugCallback, null);
 
 		vkDestroySurfaceKHR(_instance, _surface, null);
 		vkDestroyInstance(_instance, null);
@@ -182,7 +235,7 @@ public:
 	}
 
 	@property size_t outputIdx() {
-		return _currentFrame;
+		return _swapchainImageIndex;
 	}
 
 	@property RendererType renderType() const {
@@ -194,7 +247,7 @@ private:
 	Version _gameVersion;
 	IVulkanView _view;
 	VkInstance _instance;
-	VkDebugReportCallbackEXT _debugCallback;
+	VkDebugUtilsMessengerEXT _debugCallback;
 
 	VkSurfaceKHR _surface;
 
@@ -244,6 +297,8 @@ private:
 		import std.stdio;
 		import std.string : toStringz;
 
+		loadGlobalLevelFunctions(_view.getVkGetInstanceProcAddr);
+
 		writefln("Available Extensions:");
 		auto availableExtensions = getVKList(vkEnumerateInstanceExtensionProperties, null);
 		foreach (const ref VkExtensionProperties e; availableExtensions)
@@ -267,21 +322,24 @@ private:
 		const(char)*[] layers;
 		const(char)*[] extensions = _view.getRequiredVulkanInstanceExtensions();
 
-		debug extensions ~= VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+		debug extensions ~= VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 		debug layers ~= "VK_LAYER_LUNARG_standard_validation";
+
 		createInfo.enabledLayerCount = cast(uint)layers.length;
 		createInfo.ppEnabledLayerNames = &layers[0];
 		createInfo.enabledExtensionCount = cast(uint)extensions.length;
 		createInfo.ppEnabledExtensionNames = &extensions[0];
 
 		vkAssert(vkCreateInstance(&createInfo, null, &_instance), "failed to create instance!");
+		loadInstanceLevelFunctions(_instance);
 
 		debug {
-			// VK_LAYER_LUNARG_standard_validation HOOK callback
-			VkDebugReportCallbackCreateInfoEXT createInfo2;
-			createInfo2.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-			createInfo2.pfnCallback = assumeNoGC(&vulkanDebugCallback); // can fail. check for VK_SUCCESS
-			vkAssert(CreateDebugReportCallbackEXT(_instance, &createInfo2, null, &_debugCallback), "Failed to create debug report callback");
+			VkDebugUtilsMessengerCreateInfoEXT debugInfo;
+			debugInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+			debugInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+				| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+			debugInfo.pfnUserCallback = assumeNoGC(&vulkanDebugCallback);
+			vkAssert(vkCreateDebugUtilsMessengerEXT(_instance, &debugInfo, null, &_debugCallback), "Failed to create debug report callback");
 		}
 	}
 
@@ -330,6 +388,8 @@ private:
 	}
 
 	void _createSyncObjects() {
+		import std.format : format;
+
 		enum maxFramesInFlight = 2;
 		_imageAvailableSemaphores.length = maxFramesInFlight;
 		_renderFinishedSemaphores.length = maxFramesInFlight;
@@ -341,8 +401,13 @@ private:
 
 		foreach (i; 0 .. maxFramesInFlight) {
 			vkAssert(_device.dispatch.CreateSemaphore(&semaphoreInfo, &_imageAvailableSemaphores[i]));
+			setVkObjectName(&_device, VK_OBJECT_TYPE_SEMAPHORE, _imageAvailableSemaphores[i], format("Image Available Semaphore #%d", i));
+
 			vkAssert(_device.dispatch.CreateSemaphore(&semaphoreInfo, &_renderFinishedSemaphores[i]));
+			setVkObjectName(&_device, VK_OBJECT_TYPE_SEMAPHORE, _renderFinishedSemaphores[i], format("Render Finished Semaphore #%d", i));
+
 			vkAssert(_device.dispatch.CreateFence(&fenceInfo, &_inFlightFences[i]));
+			setVkObjectName(&_device, VK_OBJECT_TYPE_FENCE, _imageAvailableSemaphores[i], format("In Flight Fence #%d", i));
 		}
 	}
 }

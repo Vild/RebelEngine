@@ -88,6 +88,8 @@ struct BlendState {
 }
 
 struct PipelineBuilder {
+	string name;
+
 	RenderPass renderpass;
 
 	ShaderModule[] shaderStages;

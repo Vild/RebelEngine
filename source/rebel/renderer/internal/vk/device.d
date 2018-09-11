@@ -149,6 +149,8 @@ private:
 			{ queueFamilyIndex: queueInfo.present, queueCount: 1, pQueuePriorities: &queuePriority }
 		];
 		// dfmt on
+		if (queueInfo.graphics == queueInfo.present)
+			queueCreateInfos = queueCreateInfos[0 .. 1];
 
 		const(char)*[] layers;
 		debug layers ~= "VK_LAYER_LUNARG_standard_validation";
@@ -167,12 +169,22 @@ private:
 		VkDevice tmpDevice;
 		vkAssert(vkCreateDevice(device, &deviceCreateInfo, null, &tmpDevice), "Create device failed!");
 		dispatch = DispatchDevice(tmpDevice);
+		setVkObjectName(&this, VK_OBJECT_TYPE_DEVICE, tmpDevice, "Main device");
 
 		dispatch.GetDeviceQueue(queueInfo.graphics, 0, &graphicsQueue);
 		assert(graphicsQueue, "Graphic queue is null!");
+		setVkObjectName(&this, VK_OBJECT_TYPE_DEVICE, tmpDevice, "Main device");
 
-		dispatch.GetDeviceQueue(queueInfo.present, 0, &presentQueue);
-		assert(presentQueue, "Present queue is null!");
+		if (queueCreateInfos.length == 1) {
+			setVkObjectName(&this, VK_OBJECT_TYPE_QUEUE, graphicsQueue, "Graphics- & Present Queue");
+			presentQueue = graphicsQueue;
+		} else {
+			setVkObjectName(&this, VK_OBJECT_TYPE_QUEUE, graphicsQueue, "Graphics Queue");
+
+			dispatch.GetDeviceQueue(queueInfo.present, 0, &presentQueue);
+			assert(presentQueue, "Present queue is null!");
+			setVkObjectName(&this, VK_OBJECT_TYPE_QUEUE, presentQueue, "Present Queue");
+		}
 	}
 
 	void _createSwapChain() {
@@ -224,6 +236,7 @@ private:
 
 		{
 			ImageTemplateBuilder builder;
+			builder.name = "SwapChain Image Template";
 			builder.format = swapChainImageFormat.format.translate;
 			builder.samples = 1;
 			builder.size = uvec2(swapChainExtent.width, swapChainExtent.height);
@@ -261,8 +274,14 @@ private:
 
 		dispatch.CreateSwapchainKHR(&createInfo, &swapChain);
 		assert(swapChain, "Create swapchain failed!");
+		setVkObjectName(&this, VK_OBJECT_TYPE_SWAPCHAIN_KHR, swapChain, "Main swapchain");
 
 		swapChainImages = getVKList(&dispatch.GetSwapchainImagesKHR, swapChain);
+		foreach (i, image; swapChainImages) {
+			import std.format : format;
+
+			setVkObjectName(&this, VK_OBJECT_TYPE_IMAGE, image, format("Swapchain Image #%d", i));
+		}
 	}
 
 	void _createImageViews() {
@@ -271,23 +290,12 @@ private:
 
 		ImageBuilder builder;
 		builder.imageTemplate = fbImageTemplate;
-		foreach (i, image; swapChainImages)
-			fbImages[i] = renderer.construct(builder, image);
+		foreach (i, image; swapChainImages) {
+			import std.format : format;
 
-		/*VkImageViewCreateInfo createInfo;
-			createInfo.image = image;
-			createInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
-			createInfo.format = swapChainImageFormat.format;
-			createInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-			createInfo.subresourceRange.baseMipLevel = 0;
-			createInfo.subresourceRange.levelCount = 1;
-			createInfo.subresourceRange.baseArrayLayer = 0;
-			createInfo.subresourceRange.layerCount = 1;
-			dispatch.CreateImageView(&createInfo, &swapChainImageViews[i]);*/
+			builder.name = format("Swapchain ImageView for output #%d", i);
+			fbImages[i] = renderer.construct(builder, image);
+		}
 	}
 
 	void _createFramebuffers() {
@@ -295,7 +303,10 @@ private:
 		framebuffers.length = fbImages.length;
 
 		foreach (i, Image image; fbImages) {
+			import std.format : format;
+
 			FramebufferBuilder builder;
+			builder.name = format("Framebuffer for output #%d", i);
 			builder.attachments = [image];
 			builder.dimension = uvec3(swapChainExtent.width, swapChainExtent.height, 1);
 			builder.renderPass = fbRenderPass;
@@ -309,8 +320,10 @@ private:
 
 		poolInfo.flags = VkCommandPoolCreateFlagBits.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		vkAssert(dispatch.CreateCommandPool(&poolInfo, &defaultCommandPool));
+		setVkObjectName(&this, VK_OBJECT_TYPE_COMMAND_POOL, defaultCommandPool, "Default CommandPool");
 
 		poolInfo.flags |= VkCommandPoolCreateFlagBits.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 		vkAssert(dispatch.CreateCommandPool(&poolInfo, &changeEachFrameCommandPool));
+		setVkObjectName(&this, VK_OBJECT_TYPE_COMMAND_POOL, changeEachFrameCommandPool, "Change Each Frame CommandPool");
 	}
 }

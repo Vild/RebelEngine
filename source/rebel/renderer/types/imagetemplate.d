@@ -38,6 +38,7 @@ enum ImageLayout {
 }
 
 struct ImageTemplateBuilder {
+	string name;
 	ImageFormat format;
 	ImageUsage usage;
 	uvec2 size;

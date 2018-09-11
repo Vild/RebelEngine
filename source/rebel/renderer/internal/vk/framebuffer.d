@@ -39,6 +39,8 @@ struct VKFramebufferData {
 		framebufferInfo.layers = builder.dimension.z;
 
 		vkAssert(device.dispatch.CreateFramebuffer(&framebufferInfo, &framebuffer));
+
+		setVkObjectName(device, VK_OBJECT_TYPE_FRAMEBUFFER, framebuffer, builder.name);
 	}
 
 	~this() {
