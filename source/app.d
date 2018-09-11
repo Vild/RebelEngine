@@ -132,7 +132,7 @@ private:
 
 		builder.vertexTopology = VertexTopology.triangleList;
 
-		builder.viewports = [Viewport(vec2(0, 0), cast(vec2)_view.size, vec2(0, 1))];
+		builder.viewports = [Viewport(vec2(0, 0), vec2(_view.size), vec2(0, 1))];
 		builder.scissors = [Scissor(ivec2(0, 0), uvec2(_view.size))];
 
 		builder.rasterizationState.depthClampEnable = false;
@@ -158,6 +158,7 @@ private:
 		_commandBuffers.length = _renderer.outputFramebuffers.length;
 		foreach (i, Framebuffer fb; _renderer.outputFramebuffers) {
 			import std.format : format;
+
 			CommandBufferBuilder builder;
 			builder.name = format("Main commandbuffer - Framebuffer #%d", i);
 			builder.callback = (ICommandBufferRecordingState rs) {
