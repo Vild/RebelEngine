@@ -29,12 +29,11 @@ struct Handle(Type_, size_t MaxCount_) {
 	private alias Type = Type_;
 	private enum size_t MaxCount = MaxCount_;
 
-	private enum BitSize = 1 + cast(size_t)MaxCount.log2.ceil + 4 + 1 + 2;
+	private enum BitSize = cast(size_t)MaxCount.log2.ceil + 4 + 1 + 2;
 	private enum BitSizeRound = BitSize.roundUpToPowerOf2;
 
 	// dfmt off
 	mixin(bitfields!(
-		bool, "instantiate", 1,
 		size_t, "id", cast(size_t)MaxCount.log2.ceil,
 		ubyte, "magic", 4,
 		bool, "inUse", 1,
@@ -44,7 +43,7 @@ struct Handle(Type_, size_t MaxCount_) {
 	// dfmt on
 
 	@property bool isValid() const {
-		return instantiate && id < MaxCount;
+		return inUse && id < MaxCount;
 	}
 
 	// I could dream
@@ -61,8 +60,8 @@ struct HandleRefData(HandleType_, Type) if (is(HandleType_ : Handle!(Type, MaxCo
 			_handle.refGotten = cast(ubyte)(_handle.refGotten - 1);
 	}
 
-	@property ref T get(T = Type)() if (is(T == Type) || is(typeof(T.tupleof[0]) == Type)) {
-		return *cast(T*)_data;
+	@property T* get(T = Type)() if (is(T == Type) || is(typeof(T.tupleof[0]) == Type)) {
+		return cast(T*)_data;
 	}
 
 	/*alias get this;
@@ -100,7 +99,6 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 	HandleType[MaxCount] handles = () {
 		HandleType[MaxCount] output;
 		foreach (i, ref hdl; output) {
-			hdl.instantiate = true;
 			hdl.id = i;
 		}
 		return output;
@@ -108,7 +106,9 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 	Type[MaxCount] data;
 
 	HandleRefData!(HandleType, Type) get(HandleType h) {
-		assert(h.isValid, "Handle is invalid");
+		import std.format : format;
+
+		assert(h.isValid, format!"Handle is invalid! inUse: %s, id %s < %s"(h.inUse, h.id, h.MaxCount));
 		assert(handles[h.id].magic == h.magic, "Old handle - Magic is wrong");
 		assert(handles[h.id].inUse, "Old handle - Not in use");
 		assert(!handles[h.id].refGotten, "Someone is already holding a ref of this handle");
@@ -119,6 +119,7 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 	HandleType create(Args...)(Args args) {
 		import std.algorithm : find;
 		import std.range : front, empty;
+		import std.conv : emplace;
 
 		auto handlePtr = find!"a.inUse == b"(handles[], false);
 		assert(!handlePtr.empty, "Out of handles!");
@@ -127,7 +128,7 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 
 		handle.magic = cast(ubyte)(handle.magic + 1);
 
-		data[handle.id] = Type(args);
+		emplace(&data[handle.id], args);
 
 		return *handle;
 	}

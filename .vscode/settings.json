@@ -30,6 +30,7 @@
 		"vector": "cpp",
 		"__config": "cpp",
 		"__nullptr": "cpp",
-		"limits": "cpp"
+		"limits": "cpp",
+		"stdexcept": "cpp"
 	}
 }

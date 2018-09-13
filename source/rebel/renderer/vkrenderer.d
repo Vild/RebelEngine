@@ -81,6 +81,9 @@ extern (C) static VkBool32 vulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBi
 		}
 
 		stderr.writefln("Message:\n\t%s", pCallbackData.pMessage.fromStringz);
+		debug asm pure nothrow @nogc @trusted {
+			int 3;
+		}
 	} catch (Exception) {
 	}
 
@@ -130,21 +133,37 @@ public:
 	}
 
 	void newFrame() {
+		_device.dispatch.DeviceWaitIdle();
 		_device.dispatch.WaitForFences(1, &_inFlightFences[_currentFrame], true, size_t.max);
 
 		VkResult result = _device.dispatch.AcquireNextImageKHR(_device.swapChain, size_t.max,
 				_imageAvailableSemaphores[_currentFrame], VK_NULL_HANDLE, &_swapchainImageIndex);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+			writeln("[", __LINE__, "] Will recreate due to result = ", result);
 			_recreate();
 			return newFrame();
 		} else
 			vkAssert(result);
+
+		writeln("_swapchainImageIndex = ", _swapchainImageIndex);
 	}
 
 	void submit(CommandBuffer cb) {
-		CommandBuffer.Ref c = get(cb);
-		_submittedCommandBuffers ~= c.get!VKCommandBufferData().commandBuffer;
+		scope CommandBuffer.Ref c = get(cb);
+		auto cData = c.get!VKCommandBufferData();
+		_submittedCommandBuffers ~= cData.commandBuffer;
+		writeln("Will render: ", cData.builder.name);
+
+		scope Framebuffer.Ref f = get(cData.framebuffer);
+		auto fData = f.get!VKFramebufferData();
+		writeln("Framebuffer name: ", fData.builder.name);
+
+		foreach (Image image; fData.builder.attachments) {
+			scope Image.Ref i = get(image);
+			auto iData = i.get!VKImageData();
+			writeln("\tImage name: ", iData.builder.name);
+		}
 	}
 
 	void finalize() {
@@ -186,6 +205,7 @@ public:
 		bool framebufferResized; // TODO: FIX THIS NOW
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
 			framebufferResized = false;
+			writeln("[", __LINE__, "] Will recreate due to result = ", result);
 			_recreate();
 		} else
 			vkAssert(result);
@@ -194,6 +214,7 @@ public:
 	}
 
 	// dfmt off
+	import std.stdio;
 	CommandBuffer construct(ref CommandBufferBuilder builder) { return _commandBuffers.create(builder, &_device); }
 	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(builder, &_device); }
 	Image construct(ref ImageBuilder builder) { return _images.create(builder, &_device); }
@@ -205,21 +226,21 @@ public:
 	// Custom
 	Image construct(ref ImageBuilder builder, VkImage image) { return _images.create(builder, &_device, image); }
 
-	CommandBuffer.Ref get(CommandBuffer handler) { return _commandBuffers.get(handler); }
-	Framebuffer.Ref get(Framebuffer handler) { return _framebuffers.get(handler); }
-	Image.Ref get(Image handler) { return _images.get(handler); }
-	ImageTemplate.Ref get(ImageTemplate handler) { return _imageTemplates.get(handler); }
-	Pipeline.Ref get(Pipeline handler) { return _pipelines.get(handler); }
-	RenderPass.Ref get(RenderPass handler) { return _renderPasses.get(handler); }
-	ShaderModule.Ref get(ShaderModule handler) { return _shaderModules.get(handler); }
+	CommandBuffer.Ref get(CommandBuffer handle) { return _commandBuffers.get(handle); }
+	Framebuffer.Ref get(Framebuffer handle) { return _framebuffers.get(handle); }
+	Image.Ref get(Image handle) { return _images.get(handle); }
+	ImageTemplate.Ref get(ImageTemplate handle) { return _imageTemplates.get(handle); }
+	Pipeline.Ref get(Pipeline handle) { return _pipelines.get(handle); }
+	RenderPass.Ref get(RenderPass handle) { return _renderPasses.get(handle); }
+	ShaderModule.Ref get(ShaderModule handle) { return _shaderModules.get(handle); }
 
-	void destruct(CommandBuffer handler) { return _commandBuffers.remove(handler); }
-	void destruct(Framebuffer handler) { return _framebuffers.remove(handler); }
-	void destruct(Image handler) { return _images.remove(handler); }
-	void destruct(ImageTemplate handler) { return _imageTemplates.remove(handler); }
-	void destruct(Pipeline handler) { return _pipelines.remove(handler); }
-	void destruct(RenderPass handler) { return _renderPasses.remove(handler); }
-	void destruct(ShaderModule handler) { return _shaderModules.remove(handler); }
+	void destruct(CommandBuffer handle) { assert(!handle.isValid); return _commandBuffers.remove(handle); }
+	void destruct(Framebuffer handle) { assert(!handle.isValid); return _framebuffers.remove(handle); }
+	void destruct(Image handle) { assert(!handle.isValid); return _images.remove(handle); }
+	void destruct(ImageTemplate handle) { assert(!handle.isValid); return _imageTemplates.remove(handle); }
+	void destruct(Pipeline handle) { assert(!handle.isValid); return _pipelines.remove(handle); }
+	void destruct(RenderPass handle) { assert(!handle.isValid); return _renderPasses.remove(handle); }
+	void destruct(ShaderModule handle) { assert(!handle.isValid); return _shaderModules.remove(handle); }
 	// dfmt on
 
 	@property ImageTemplate framebufferImageTemplate() {
@@ -231,6 +252,12 @@ public:
 	}
 
 	@property Framebuffer[] outputFramebuffers() {
+		writeln("outputFramebuffers: ");
+		foreach (Framebuffer fb; _device.framebuffers) {
+			scope Framebuffer.Ref fbRef = get(fb);
+			string name = fbRef.get!VKFramebufferData().builder.name;
+			writeln("\t", name);
+		}
 		return _device.framebuffers;
 	}
 
@@ -270,46 +297,60 @@ private:
 	HandleStorage!(ShaderModule, VKShaderModuleData) _shaderModules;
 
 	void _recreate() {
-		import std.typecons : tuple;
-
-		assert(0, "NOT allowed yet");
-
-		/+_device.dispatch.DeviceWaitIdle();
-		_device.recreate();
-		//_createVulkanSwapChain();
-		//_createVulkanImageViews();
-		//_createFramebuffers();
-
-		void recreate(T)(ref T storage) {
-			foreach (ref obj; storage) {
+		void cleanup(T)(ref T storage) {
+			foreach (ref obj; storage)
 				obj.cleanup();
-				obj.create();
-			}
 		}
 
-		recreate(_renderPasses);
-		recreate(_pipelines);
-		recreate(_commandBuffers);
-		//createCommandBuffers();+/
+		void create(T)(ref T storage) {
+			foreach (ref obj; storage)
+				obj.create();
+		}
+
+		writeln("WILL REBUILD!!!");
+
+		_device.dispatch.DeviceWaitIdle();
+		_device.dispatch.vkQueueWaitIdle(_device.presentQueue);
+
+		cleanup(_commandBuffers);
+		cleanup(_pipelines);
+		cleanup(_framebuffers);
+		cleanup(_renderPasses);
+		cleanup(_images);
+		cleanup(_imageTemplates);
+
+		_device.recreate();
+
+		create(_imageTemplates);
+		create(_images);
+		create(_renderPasses);
+		create(_framebuffers);
+		create(_pipelines);
+		create(_commandBuffers);
+
+		_device.dispatch.DeviceWaitIdle();
+		_device.dispatch.vkQueueWaitIdle(_device.presentQueue);
+		writeln("DONE WITH REBUILD!!!");
 	}
 
 	void _createInstance() {
 		import std.stdio;
-		import std.string : toStringz;
+		import std.string : toStringz, fromStringz;
 
 		loadGlobalLevelFunctions(_view.getVkGetInstanceProcAddr);
 
 		writefln("Available Extensions:");
 		auto availableExtensions = getVKList(vkEnumerateInstanceExtensionProperties, null);
 		foreach (const ref VkExtensionProperties e; availableExtensions)
-			writefln("\t%s Version %d.%d.%d", e.extensionName, VK_VERSION_MAJOR(e.specVersion),
+			writefln("\t%-64s Version %d.%d.%d", e.extensionName.ptr.fromStringz, VK_VERSION_MAJOR(e.specVersion),
 					VK_VERSION_MINOR(e.specVersion), VK_VERSION_PATCH(e.specVersion));
 		writefln("Available Layers:");
 		auto availableLayers = getVKList(vkEnumerateInstanceLayerProperties);
 		foreach (const ref VkLayerProperties l; availableLayers)
-			writefln("\t%s: Version %d.%d.%d, ImplVersion %d.%d.%d\n\t\t%s", l.layerName, VK_VERSION_MAJOR(l.specVersion),
-					VK_VERSION_MINOR(l.specVersion), VK_VERSION_PATCH(l.specVersion), VK_VERSION_MAJOR(l.implementationVersion),
-					VK_VERSION_MINOR(l.implementationVersion), VK_VERSION_PATCH(l.implementationVersion), l.description);
+			writefln("\t%-64s: Version %d.%d.%d, ImplVersion %d.%d.%d\n\t\t%s", l.layerName.ptr.fromStringz,
+					VK_VERSION_MAJOR(l.specVersion), VK_VERSION_MINOR(l.specVersion), VK_VERSION_PATCH(l.specVersion),
+					VK_VERSION_MAJOR(l.implementationVersion), VK_VERSION_MINOR(l.implementationVersion),
+					VK_VERSION_PATCH(l.implementationVersion), l.description.ptr.fromStringz);
 		VkApplicationInfo appInfo;
 		appInfo.pApplicationName = _gameName.toStringz;
 		appInfo.applicationVersion = VK_MAKE_VERSION(_gameVersion.major, _gameVersion.minor, _gameVersion.patch);

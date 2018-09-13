@@ -44,7 +44,7 @@ private:
 	CommandBuffer[] _commandBuffers;
 
 	void _createRenderpass() {
-		Attachment colorAttachment;
+		Attachment* colorAttachment = new Attachment;
 		{
 			colorAttachment.imageTemplate = _renderer.framebufferImageTemplate;
 			colorAttachment.loadOp = LoadOperation.clear;
@@ -55,16 +55,16 @@ private:
 			colorAttachment.finalLayout = ImageLayout.present;
 		}
 
-		Subpass subpass;
+		Subpass* subpass = new Subpass;
 		{
 			subpass.bindPoint = SubpassBindPoint.graphics;
-			subpass.colorOutput = [SubpassAttachment(&colorAttachment, ImageLayout.color)];
+			subpass.colorOutput = [SubpassAttachment(colorAttachment, ImageLayout.color)];
 		}
 
 		SubpassDependency dependency;
 		{
 			dependency.srcSubpass = externalSubpass;
-			dependency.dstSubpass = &subpass;
+			dependency.dstSubpass = subpass;
 			dependency.srcStageMask = StageFlags.colorOutput;
 			dependency.dstStageMask = StageFlags.colorOutput;
 			dependency.srcAccessMask = AccessMask.none;
@@ -73,8 +73,8 @@ private:
 
 		RenderPassBuilder builder;
 		builder.name = "Main RenderPass";
-		builder.attachments = [&colorAttachment];
-		builder.subpasses = [&subpass];
+		builder.attachments = [colorAttachment];
+		builder.subpasses = [subpass];
 		builder.dependencies = [dependency];
 
 		_renderPass = _renderer.construct(builder);
@@ -156,22 +156,32 @@ private:
 
 	void _createCommandBuffers() {
 		_commandBuffers.length = _renderer.outputFramebuffers.length;
-		foreach (i, Framebuffer fb; _renderer.outputFramebuffers) {
+		foreach (i; 0 .. _renderer.outputFramebuffers.length) {
 			import std.format : format;
 
 			CommandBufferBuilder builder;
 			builder.name = format("Main commandbuffer - Framebuffer #%d", i);
-			builder.callback = (ICommandBufferRecordingState rs) {
-				rs.renderPass = _renderPass;
-				rs.framebuffer = fb;
-				rs.pipeline = _pipeline;
-				rs.renderArea = uvec4(0, 0, _view.size.x, _view.size.y);
-				rs.clearColors = [vec4(34 / 255.0f, 0, 34 / 255.0f, 1.0f)];
+			builder.callback = (size_t fbIndex) {
+				return (ICommandBufferRecordingState rs) {
+					Framebuffer fb = _renderer.outputFramebuffers[fbIndex];
+					uvec2 size;
+					{
+						scope Framebuffer.Ref fbRef = _renderer.get(fb);
+						FramebufferData* data = fbRef.get();
+						size = data.dimension.xy;
+					}
 
-				rs.finalizeState();
+					rs.renderPass = _renderPass;
+					rs.framebuffer = fb;
+					rs.pipeline = _pipeline;
+					rs.renderArea = uvec4(0, 0, size.x, size.y);
+					rs.clearColors = [vec4(34 / 255.0f, 0, 34 / 255.0f, 1.0f)];
 
-				rs.draw(3, 1, 0, 0);
-			};
+					rs.finalizeState();
+
+					rs.draw(3, 1, 0, 0);
+				};
+			}(i);
 			_commandBuffers[i] = _renderer.construct(builder);
 		}
 	}

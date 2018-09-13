@@ -131,7 +131,7 @@ struct VKPipelineData {
 		{
 			import rebel.renderer.internal.vk.renderpass;
 
-			RenderPass.Ref renderpass = renderer.get(builder.renderpass);
+			scope RenderPass.Ref renderpass = renderer.get(builder.renderpass);
 
 			pipelineInfo.renderPass = renderpass.get!VKRenderPassData().renderPass;
 		}

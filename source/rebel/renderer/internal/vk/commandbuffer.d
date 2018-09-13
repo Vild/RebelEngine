@@ -11,68 +11,65 @@ import std.typecons;
 
 final class CommandBufferRecordingState : ICommandBufferRecordingState {
 public:
-	VKCommandBufferData* cb;
-	this(VKCommandBufferData* cb) {
-		this.cb = cb;
-	}
+	VKCommandBufferData* cbData;
 
 final override:
 	@property void renderPass(RenderPass renderPass) {
-		cb.renderPass = renderPass;
+		cbData.renderPass = renderPass;
 	}
 
 	@property void pipeline(Pipeline pipeline) {
-		cb.pipeline = pipeline;
+		cbData.pipeline = pipeline;
 	}
 
 	@property void framebuffer(Framebuffer framebuffer) {
-		cb.framebuffer = framebuffer;
+		cbData.framebuffer = framebuffer;
 	}
 
 	@property void renderArea(uvec4 renderArea) {
-		cb.renderArea = renderArea;
+		cbData.renderArea = renderArea;
 	}
 
 	@property void clearColors(vec4[] clearColors) {
-		cb.clearColors = clearColors;
+		cbData.clearColors = clearColors;
 	}
 
 	void finalizeState() {
 		VkRenderPass rp;
 		{
-			scope RenderPass.Ref rpRef = cb.renderer.get(cb.renderPass);
+			scope RenderPass.Ref rpRef = cbData.renderer.get(cbData.renderPass);
 			rp = rpRef.get!VKRenderPassData().renderPass;
 		}
 		VkFramebuffer fb;
 		{
-			scope Framebuffer.Ref fbRef = cb.renderer.get(cb.framebuffer);
+			scope Framebuffer.Ref fbRef = cbData.renderer.get(cbData.framebuffer);
 			fb = fbRef.get!VKFramebufferData().framebuffer;
 		}
 		VkClearValue[] clearValues;
-		clearValues.length = cb.clearColors.length;
-		foreach (i, vec4 color; cb.clearColors)
+		clearValues.length = cbData.clearColors.length;
+		foreach (i, vec4 color; cbData.clearColors)
 			clearValues[i].color = VkClearColorValue([color.r, color.g, color.b, color.a]);
 
 		VkRenderPassBeginInfo info;
 		info.renderPass = rp;
 		info.framebuffer = fb;
-		info.renderArea = VkRect2D(VkOffset2D(cb.renderArea.x, cb.renderArea.y), VkExtent2D(cb.renderArea.z, cb.renderArea.w));
+		info.renderArea = VkRect2D(VkOffset2D(cbData.renderArea.x, cbData.renderArea.y), VkExtent2D(cbData.renderArea.z, cbData.renderArea.w));
 		info.pClearValues = clearValues.ptr;
 		info.clearValueCount = cast(uint)clearValues.length;
 
-		cb.device.dispatch.vkCmdBeginRenderPass(cb.commandBuffer, &info, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
+		cbData.device.dispatch.vkCmdBeginRenderPass(cbData.commandBuffer, &info, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 
 		VkPipeline p;
 		{
-			scope Pipeline.Ref pRef = cb.renderer.get(cb.pipeline);
+			scope Pipeline.Ref pRef = cbData.renderer.get(cbData.pipeline);
 			p = pRef.get!VKPipelineData().pipeline;
 		}
 
-		cb.device.dispatch.vkCmdBindPipeline(cb.commandBuffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, p);
+		cbData.device.dispatch.vkCmdBindPipeline(cbData.commandBuffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, p);
 	}
 
 	void draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance) {
-		cb.device.dispatch.vkCmdDraw(cb.commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+		cbData.device.dispatch.vkCmdDraw(cbData.commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 	}
 }
 
@@ -83,7 +80,7 @@ struct VKCommandBufferData {
 	CommandBufferBuilder builder;
 	VKDevice* device;
 
-	typeof(scoped!CommandBufferRecordingState(null)) recordingState = void; //TODO: Fix this hack, if possible
+	typeof(scoped!CommandBufferRecordingState()) recordingState = void; //TODO: Fix this hack, if possible
 
 	IRenderer renderer;
 	VkCommandPool pool;
@@ -101,7 +98,7 @@ struct VKCommandBufferData {
 		renderer = Engine.instance.renderer;
 
 		pool = builder.willChangeEachFrame ? device.changeEachFrameCommandPool : device.defaultCommandPool;
-		recordingState = scoped!CommandBufferRecordingState(&this);
+		recordingState = scoped!CommandBufferRecordingState();
 
 		VkCommandBufferAllocateInfo info;
 		info.commandPool = pool;
@@ -120,6 +117,7 @@ struct VKCommandBufferData {
 
 		setVkObjectName(device, VK_OBJECT_TYPE_COMMAND_BUFFER, commandBuffer, builder.name);
 
+		recordingState.cbData = &this;
 		builder.callback(recordingState);
 
 		device.dispatch.vkCmdEndRenderPass(commandBuffer);

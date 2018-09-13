@@ -84,7 +84,7 @@ struct VKDevice {
 			physicalSupportedExtensions[idx] = extension.extensionName.ptr.fromStringz.idup;
 
 		_createLogicalDevice();
-		_createSwapChain();
+		_createSwapChain(false);
 		_createImageViews();
 		_createCommandPools();
 	}
@@ -135,7 +135,7 @@ struct VKDevice {
 	}
 
 	void recreate() {
-		//TODO:
+		_createSwapChain(true);
 	}
 
 private:
@@ -187,7 +187,7 @@ private:
 		}
 	}
 
-	void _createSwapChain() {
+	void _createSwapChain(bool recreate) {
 		VkSurfaceFormatKHR surfaceFormat = (VkSurfaceFormatKHR[] formats) {
 			if (formats.length == 1 && formats[0].format == VkFormat.VK_FORMAT_UNDEFINED) {
 				VkSurfaceFormatKHR format;
@@ -234,7 +234,12 @@ private:
 		if (swapChainInfo.capabilities.maxImageCount > 0 && imageCount > swapChainInfo.capabilities.maxImageCount)
 			imageCount = swapChainInfo.capabilities.maxImageCount;
 
-		{
+		if (recreate) {
+			scope ImageTemplate.Ref itRef = renderer.get(fbImageTemplate);
+			auto data = itRef.get!VKImageTemplateData();
+			data.builder.format = swapChainImageFormat.format.translate;
+			data.builder.size = uvec2(swapChainExtent.width, swapChainExtent.height);
+		} else {
 			ImageTemplateBuilder builder;
 			builder.name = "SwapChain Image Template";
 			builder.format = swapChainImageFormat.format.translate;
@@ -270,26 +275,38 @@ private:
 		createInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		createInfo.presentMode = presentMode;
 		createInfo.clipped = true;
-		createInfo.oldSwapchain = swapChain;
+		auto oldSwapchain = createInfo.oldSwapchain = swapChain;
 
 		dispatch.CreateSwapchainKHR(&createInfo, &swapChain);
 		assert(swapChain, "Create swapchain failed!");
 		setVkObjectName(&this, VK_OBJECT_TYPE_SWAPCHAIN_KHR, swapChain, "Main swapchain");
 
+		if (oldSwapchain != VK_NULL_HANDLE)
+			dispatch.DestroySwapchainKHR(oldSwapchain);
+
+		const size_t oldLength = swapChainImages.length;
+
 		swapChainImages = getVKList(&dispatch.GetSwapchainImagesKHR, swapChain);
+
 		foreach (i, image; swapChainImages) {
 			import std.format : format;
 
 			setVkObjectName(&this, VK_OBJECT_TYPE_IMAGE, image, format("Swapchain Image #%d", i));
 		}
+		if (recreate) {
+			assert(oldLength == swapChainImages.length);
+			foreach (i, VkImage image; swapChainImages) {
+				scope Image.Ref imgRef = renderer.get(fbImages[i]);
+				imgRef.get!VKImageData().image = image;
+			}
+		}
+
 	}
 
 	void _createImageViews() {
-		//swapChainImageViews.length = swapChainImages.length;
-		fbImages.length = swapChainImages.length;
-
 		ImageBuilder builder;
 		builder.imageTemplate = fbImageTemplate;
+		fbImages.length = swapChainImages.length;
 		foreach (i, image; swapChainImages) {
 			import std.format : format;
 
@@ -298,10 +315,10 @@ private:
 		}
 	}
 
-	void _createFramebuffers() {
+	void _createFramebuffers(bool recreate = false) {
 		assert(fbRenderPass.isValid);
-		framebuffers.length = fbImages.length;
 
+		framebuffers.length = fbImages.length;
 		foreach (i, Image image; fbImages) {
 			import std.format : format;
 

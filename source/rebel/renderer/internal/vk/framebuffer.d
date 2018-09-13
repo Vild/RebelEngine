@@ -25,6 +25,8 @@ struct VKFramebufferData {
 		IRenderer renderer = Engine.instance.renderer;
 		VkFramebufferCreateInfo framebufferInfo;
 
+		base.dimension = builder.dimension;
+
 		VkImageView[] attachments;
 		foreach (Image m; builder.attachments) {
 			scope Image.Ref shader = renderer.get(m);

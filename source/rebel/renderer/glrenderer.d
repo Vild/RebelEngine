@@ -44,19 +44,21 @@ public:
 		glClearColor(0, 34.0f / 255, 34.0f / 255, 1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
-	void submit(CommandBuffer commandbuffer){}
+
+	void submit(CommandBuffer commandbuffer) {
+	}
 
 	void finalize() {
 	}
 
 	// dfmt off
-	CommandBuffer construct(ref CommandBufferBuilder builder) { return _commandBuffers.create(/*builder*/); }
-	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(/*builder*/); }
-	Image construct(ref ImageBuilder builder) { return _images.create(/*builder*/); }
-	ImageTemplate construct(ref ImageTemplateBuilder builder) { return _imageTemplates.create(/*builder*/); }
-	Pipeline construct(ref PipelineBuilder builder) { return _pipelines.create(/*builder*/); }
-	RenderPass construct(ref RenderPassBuilder builder) { return _renderPasses.create(/*builder*/); }
-	ShaderModule construct(ref ShaderModuleBuilder builder) { return _shaderModules.create(/*builder*/); }
+	CommandBuffer construct(ref CommandBufferBuilder builder) { return _commandBuffers.create(builder); }
+	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(builder); }
+	Image construct(ref ImageBuilder builder) { return _images.create(builder); }
+	ImageTemplate construct(ref ImageTemplateBuilder builder) { return _imageTemplates.create(builder); }
+	Pipeline construct(ref PipelineBuilder builder) { return _pipelines.create(builder); }
+	RenderPass construct(ref RenderPassBuilder builder) { return _renderPasses.create(builder); }
+	ShaderModule construct(ref ShaderModuleBuilder builder) { return _shaderModules.create(builder); }
 
 	CommandBuffer.Ref get(CommandBuffer handler) { return _commandBuffers.get(handler); }
 	Framebuffer.Ref get(Framebuffer handler) { return _framebuffers.get(handler); }
@@ -103,13 +105,21 @@ private:
 	Version _gameVersion;
 	IVulkanView _view;
 
-	HandleStorage!(CommandBuffer, CommandBufferData) _commandBuffers;
-	HandleStorage!(Framebuffer, FramebufferData) _framebuffers;
-	HandleStorage!(Image, ImageData) _images;
-	HandleStorage!(ImageTemplate, ImageTemplateData) _imageTemplates;
-	HandleStorage!(Pipeline, PipelineData) _pipelines;
-	HandleStorage!(RenderPass, RenderPassData) _renderPasses;
-	HandleStorage!(ShaderModule, ShaderModuleData) _shaderModules;
+	struct GLDummyData(T, TBuilder) {
+		T base;
+		alias base this;
+
+		this(TBuilder) {
+		}
+	}
+
+	HandleStorage!(CommandBuffer, GLDummyData!(CommandBufferData, CommandBufferBuilder)) _commandBuffers;
+	HandleStorage!(Framebuffer, GLDummyData!(FramebufferData, FramebufferBuilder)) _framebuffers;
+	HandleStorage!(Image, GLDummyData!(ImageData, ImageBuilder)) _images;
+	HandleStorage!(ImageTemplate, GLDummyData!(ImageTemplateData, ImageTemplateBuilder)) _imageTemplates;
+	HandleStorage!(Pipeline, GLDummyData!(PipelineData, PipelineBuilder)) _pipelines;
+	HandleStorage!(RenderPass, GLDummyData!(RenderPassData, RenderPassBuilder)) _renderPasses;
+	HandleStorage!(ShaderModule, GLDummyData!(ShaderModuleData, ShaderModuleBuilder)) _shaderModules;
 
 	Framebuffer _outputFramebuffer;
 

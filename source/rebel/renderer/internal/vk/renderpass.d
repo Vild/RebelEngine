@@ -28,7 +28,6 @@ struct VKRenderPassData {
 		attachments.length = builder.attachments.length;
 		foreach (idx, Attachment* attr; builder.attachments) {
 			VkAttachmentDescription* desc = &attachments[idx];
-
 			scope ImageTemplate.Ref it = renderer.get(attr.imageTemplate);
 			auto data = it.get!VKImageTemplateData;
 

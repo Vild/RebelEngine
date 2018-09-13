@@ -11,6 +11,7 @@ struct FramebufferBuilder {
 }
 
 struct FramebufferData {
+	uvec3 dimension;
 }
 
 alias Framebuffer = Handle!(FramebufferData, 64);
