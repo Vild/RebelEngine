@@ -55,6 +55,8 @@ struct Handle(Type_, size_t MaxCount_) {
 struct HandleRefData(HandleType_, Type) if (is(HandleType_ : Handle!(Type, MaxCount), Type, size_t MaxCount)) {
 	alias HandleType = HandleType_;
 
+	@disable this(this);
+
 	~this() {
 		if (_handle)
 			_handle.refGotten = cast(ubyte)(_handle.refGotten - 1);
@@ -105,7 +107,7 @@ struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Han
 	}();
 	Type[MaxCount] data;
 
-	HandleRefData!(HandleType, Type) get(HandleType h) {
+	scope HandleRefData!(HandleType, Type) get(HandleType h) {
 		import std.format : format;
 
 		assert(h.isValid, format!"Handle is invalid! inUse: %s, id %s < %s"(h.inUse, h.id, h.MaxCount));

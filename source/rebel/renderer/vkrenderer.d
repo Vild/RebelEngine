@@ -145,25 +145,12 @@ public:
 			return newFrame();
 		} else
 			vkAssert(result);
-
-		writeln("_swapchainImageIndex = ", _swapchainImageIndex);
 	}
 
 	void submit(CommandBuffer cb) {
 		scope CommandBuffer.Ref c = get(cb);
 		auto cData = c.get!VKCommandBufferData();
 		_submittedCommandBuffers ~= cData.commandBuffer;
-		writeln("Will render: ", cData.builder.name);
-
-		scope Framebuffer.Ref f = get(cData.framebuffer);
-		auto fData = f.get!VKFramebufferData();
-		writeln("Framebuffer name: ", fData.builder.name);
-
-		foreach (Image image; fData.builder.attachments) {
-			scope Image.Ref i = get(image);
-			auto iData = i.get!VKImageData();
-			writeln("\tImage name: ", iData.builder.name);
-		}
 	}
 
 	void finalize() {
@@ -252,12 +239,6 @@ public:
 	}
 
 	@property Framebuffer[] outputFramebuffers() {
-		writeln("outputFramebuffers: ");
-		foreach (Framebuffer fb; _device.framebuffers) {
-			scope Framebuffer.Ref fbRef = get(fb);
-			string name = fbRef.get!VKFramebufferData().builder.name;
-			writeln("\t", name);
-		}
 		return _device.framebuffers;
 	}
 

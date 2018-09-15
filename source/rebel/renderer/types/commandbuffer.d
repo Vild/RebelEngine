@@ -3,6 +3,10 @@ module rebel.renderer.types.commandbuffer;
 import rebel.renderer.types;
 import dlsl.vector;
 
+interface IRecordingSectionScope {
+	void defineSubsection(string name, vec4 color);
+}
+
 interface ICommandBufferRecordingState {
 	@property void renderPass(RenderPass renderPass);
 	@property void pipeline(Pipeline pipeline);
@@ -11,6 +15,8 @@ interface ICommandBufferRecordingState {
 	@property void clearColors(vec4[] clearColors);
 
 	void finalizeState();
+
+	scope IRecordingSectionScope defineSectionScope(string name, vec4 color);
 
 	void draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance);
 }

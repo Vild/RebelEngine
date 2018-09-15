@@ -9,6 +9,34 @@ import rebel.renderer.internal.vk;
 import dlsl.vector;
 import std.typecons;
 
+final class RecordingSectionScope : IRecordingSectionScope {
+public:
+	VKCommandBufferData* cbData;
+
+	this(string name, vec4 color) {
+		import std.string : toStringz;
+
+		VkDebugUtilsLabelEXT label;
+		label.pLabelName = name.toStringz;
+		label.color[] = color[];
+		vkCmdBeginDebugUtilsLabelEXT(cbData.commandBuffer, &label);
+	}
+
+	~this() {
+		vkCmdEndDebugUtilsLabelEXT(cbData.commandBuffer);
+	}
+
+final override:
+	void defineSubsection(string name, vec4 color) {
+		import std.string : toStringz;
+
+		VkDebugUtilsLabelEXT label;
+		label.pLabelName = name.toStringz;
+		label.color[] = color[];
+		vkCmdInsertDebugUtilsLabelEXT(cbData.commandBuffer, &label);
+	}
+}
+
 final class CommandBufferRecordingState : ICommandBufferRecordingState {
 public:
 	VKCommandBufferData* cbData;
@@ -66,6 +94,11 @@ final override:
 		}
 
 		cbData.device.dispatch.vkCmdBindPipeline(cbData.commandBuffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, p);
+	}
+
+	scope IRecordingSectionScope defineSectionScope(string name, vec4 color) {
+		//TODO: Add pool allocator
+		return new RecordingSectionScope(name, color);
 	}
 
 	void draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance) {
