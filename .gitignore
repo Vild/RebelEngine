@@ -18,3 +18,4 @@ dub.selections.json
 imgui.ini
 *~
 CppCode*
+*.spv
