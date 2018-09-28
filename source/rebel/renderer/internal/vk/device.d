@@ -119,12 +119,11 @@ struct VKDevice {
 
 	uint getMemoryType(uint typeBits, VkMemoryPropertyFlags properties, bool* foundIt = null) {
 		foreach (i; 0 .. physicalMemoryProperties.memoryTypeCount) {
-			if (typeBits & 0b1)
-				if ((physicalMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-					if (foundIt)
-						*foundIt = true;
-					return i;
-				}
+			if (typeBits & 0b1 && (physicalMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+				if (foundIt)
+					*foundIt = true;
+				return i;
+			}
 
 			typeBits >>= 1;
 		}

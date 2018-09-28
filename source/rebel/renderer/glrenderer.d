@@ -52,6 +52,7 @@ public:
 	}
 
 	// dfmt off
+	Buffer construct(ref BufferBuilder builder) { return _buffers.create(builder); }
 	CommandBuffer construct(ref CommandBufferBuilder builder) { return _commandBuffers.create(builder); }
 	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(builder); }
 	Image construct(ref ImageBuilder builder) { return _images.create(builder); }
@@ -60,6 +61,7 @@ public:
 	RenderPass construct(ref RenderPassBuilder builder) { return _renderPasses.create(builder); }
 	ShaderModule construct(ref ShaderModuleBuilder builder) { return _shaderModules.create(builder); }
 
+	Buffer.Ref get(Buffer handler) { return _buffers.get(handler); }
 	CommandBuffer.Ref get(CommandBuffer handler) { return _commandBuffers.get(handler); }
 	Framebuffer.Ref get(Framebuffer handler) { return _framebuffers.get(handler); }
 	Image.Ref get(Image handler) { return _images.get(handler); }
@@ -69,6 +71,7 @@ public:
 	ShaderModule.Ref get(ShaderModule handler) { return _shaderModules.get(handler); }
 
 	void destruct(CommandBuffer handler) { return _commandBuffers.remove(handler); }
+	void destruct(Buffer handler) { return _buffers.remove(handler); }
 	void destruct(Framebuffer handler) { return _framebuffers.remove(handler); }
 	void destruct(Image handler) { return _images.remove(handler); }
 	void destruct(ImageTemplate handler) { return _imageTemplates.remove(handler); }
@@ -113,6 +116,7 @@ private:
 		}
 	}
 
+	HandleStorage!(Buffer, GLDummyData!(BufferData, BufferBuilder)) _buffers;
 	HandleStorage!(CommandBuffer, GLDummyData!(CommandBufferData, CommandBufferBuilder)) _commandBuffers;
 	HandleStorage!(Framebuffer, GLDummyData!(FramebufferData, FramebufferBuilder)) _framebuffers;
 	HandleStorage!(Image, GLDummyData!(ImageData, ImageBuilder)) _images;

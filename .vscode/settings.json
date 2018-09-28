@@ -1,6 +1,7 @@
 // Place your settings in this file to overwrite default and user settings.
 {
 	"d.enableDMDImportTiming": false,
+	"d.manyProjectsThreshold": 9999,
 	"editor.rulers": [
 		120, // soft max line length
 		160 // hard max line length

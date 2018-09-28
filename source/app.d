@@ -21,6 +21,7 @@ class TestState : IEngineState {
 		_createRenderpass();
 		_createShaderModules();
 		_createPipeline();
+		_createVertexBuffer();
 		_createCommandBuffers();
 	}
 
@@ -34,14 +35,35 @@ class TestState : IEngineState {
 	}
 
 private:
+	alias Position = ShaderData!(vec2, ImageFormat.rg32_float);
+	alias Color = ShaderData!(uvec3b, ImageFormat.rgb8_unorm);
+
+	@DataRate(DataRate.vertex) struct VkTestShaderDataVertex {
+		Position position;
+		Color color;
+	}
+
 	IRenderer _renderer;
 	IView _view;
 
 	RenderPass _renderPass;
 	ShaderModule _vertexShaderModule, _fragmentShaderModule;
+	Buffer _vertexBuffer;
 	Pipeline _pipeline;
 
 	CommandBuffer[] _commandBuffers;
+
+	enum Bindings : uint {
+		vertex = 0
+	}
+
+	// dfmt off
+	VkTestShaderDataVertex[] _vertices = [
+		VkTestShaderDataVertex(Position(0.0f, -0.5f), Color(cast(ubyte)255, cast(ubyte)255, cast(ubyte)255)),
+		VkTestShaderDataVertex(Position(0.5f, 0.5f), Color(cast(ubyte)0, cast(ubyte)255, cast(ubyte)0)),
+		VkTestShaderDataVertex(Position(-0.5f, 0.5f), Color(cast(ubyte)0, cast(ubyte)0, cast(ubyte)255))
+	];
+	// dfmt on
 
 	void _createRenderpass() {
 		Attachment* colorAttachment = new Attachment;
@@ -122,6 +144,22 @@ private:
 		}
 	}
 
+	void _createVertexBuffer() {
+		BufferBuilder builder;
+		builder.name = "Vertex Buffer";
+		builder.size = _vertices.length * _vertices[0].sizeof;
+		builder.usage = BufferUsage.vertex;
+		builder.sharing = BufferSharing.exclusive;
+
+		_vertexBuffer = _renderer.construct(builder);
+
+		scope Buffer.Ref data = _renderer.get(_vertexBuffer);
+		BufferData* buffer = data.get();
+		buffer.map();
+		(cast(VkTestShaderDataVertex[])buffer.deviceMemory)[0 .. _vertices.length] = _vertices[];
+		buffer.unmap();
+	}
+
 	void _createPipeline() {
 		PipelineBuilder builder;
 		builder.name = "Main Pipeline";
@@ -129,6 +167,11 @@ private:
 
 		builder.shaderStages ~= _vertexShaderModule;
 		builder.shaderStages ~= _fragmentShaderModule;
+
+		alias vktest = ShaderInputInfo!VkTestShaderDataVertex;
+		builder.vertexInputBindingDescriptions ~= vktest.getBindingDescription(Bindings.vertex);
+
+		builder.vertexInputAttributeDescriptions ~= vktest.getAttributeDescriptions(Bindings.vertex);
 
 		builder.vertexTopology = VertexTopology.triangleList;
 
@@ -179,7 +222,8 @@ private:
 
 					rs.finalizeState();
 
-					rs.draw(3, 1, 0, 0);
+					rs.bindVertexBuffer(Bindings.vertex, [BufferOffset(_vertexBuffer, 0)]);
+					rs.draw(cast(uint)_vertices.length, 1, 0, 0);
 				};
 			}(i);
 			_commandBuffers[i] = _renderer.construct(builder);

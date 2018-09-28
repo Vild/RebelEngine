@@ -8,8 +8,14 @@ VkFormat translate(ImageFormat format) {
 	final switch (format) {
 	case ImageFormat.undefined:
 		return VkFormat.VK_FORMAT_UNDEFINED;
+	case ImageFormat.rg8_unorm:
+		return VkFormat.VK_FORMAT_R8G8_UNORM;
+	case ImageFormat.rg32_float:
+		return VkFormat.VK_FORMAT_R32G32_SFLOAT;
 	case ImageFormat.rgb8_unorm:
 		return VkFormat.VK_FORMAT_R8G8B8_UNORM;
+	case ImageFormat.rgb32_float:
+		return VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
 	case ImageFormat.rgba8_unorm:
 		return VkFormat.VK_FORMAT_R8G8B8A8_UNORM;
 	case ImageFormat.rgba16_float:
@@ -21,6 +27,18 @@ VkFormat translate(ImageFormat format) {
 		return VkFormat.VK_FORMAT_B8G8R8_UNORM;
 	case ImageFormat.bgra8_unorm:
 		return VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
+
+	case ImageFormat.a2r10g10b10_float:
+	return VkFormat.VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+	}
+}
+
+VkVertexInputRate translate(DataRate dr) {
+	final switch (dr) {
+	case DataRate.vertex:
+		return VK_VERTEX_INPUT_RATE_VERTEX;
+	case DataRate.instance:
+		return VK_VERTEX_INPUT_RATE_INSTANCE;
 	}
 }
 
@@ -212,5 +230,23 @@ VkImageUsageFlags translate(ImageUsage iu) {
 		return VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	case ImageUsage.depthStencilAttachment:
 		return VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	}
+}
+
+VkBufferUsageFlags translate(BufferUsage bu) {
+	VkBufferUsageFlags output;
+
+	if (bu & BufferUsage.vertex)
+		output |= VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+	return output;
+}
+
+VkSharingMode translate(BufferSharing bs) {
+	final switch (bs) {
+	case BufferSharing.exclusive:
+		return VK_SHARING_MODE_EXCLUSIVE;
+	case BufferSharing.concurrent:
+		return VK_SHARING_MODE_CONCURRENT;
 	}
 }

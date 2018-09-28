@@ -1,6 +1,7 @@
 module rebel.renderer.internal.vk;
 
 public {
+	import rebel.renderer.internal.vk.buffer;
 	import rebel.renderer.internal.vk.commandbuffer;
 	import rebel.renderer.internal.vk.device;
 	import rebel.renderer.internal.vk.framebuffer;

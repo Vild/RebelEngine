@@ -5,9 +5,16 @@ import rebel.renderer.types;
 import dlsl.vector;
 
 struct VertexInputBindingDescription {
+	uint binding;
+	uint stride;
+	DataRate inputRate;
 }
 
 struct VertexInputAttributeDescription {
+	uint location;
+	uint binding;
+	ImageFormat format;
+	uint offset;
 }
 
 enum VertexTopology {

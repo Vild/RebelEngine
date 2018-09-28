@@ -58,8 +58,12 @@ struct HandleRefData(HandleType_, Type) if (is(HandleType_ : Handle!(Type, MaxCo
 	@disable this(this);
 
 	~this() {
-		if (_handle)
+		if (_handle) {
 			_handle.refGotten = cast(ubyte)(_handle.refGotten - 1);
+			static if (is(typeof(Type.onDeref)))
+				if (_handle.refGotten == 0)
+					_data.onDeref();
+		}
 	}
 
 	@property T* get(T = Type)() if (is(T == Type) || is(typeof(T.tupleof[0]) == Type)) {
@@ -87,13 +91,16 @@ private:
 		_handle = handle;
 		_handle.refGotten = cast(ubyte)(_handle.refGotten + 1);
 		_data = data;
+		static if (is(typeof(Type.onRef)))
+			if (_handle.refGotten == 1)
+				_data.onRef();
 	}
 
 	HandleType* _handle;
 	Type* _data;
 }
 
-struct HandleStorage(HandleType, Type = HandleType.Type) if (is(HandleType : Handle!(Type, MaxCount), Type, size_t MaxCount)) {
+struct HandleStorage(HandleType, Type) if (is(HandleType : Handle!(Type, MaxCount), Type, size_t MaxCount)) {
 	private enum size_t MaxCount = HandleType.MaxCount;
 
 	@disable this(this);

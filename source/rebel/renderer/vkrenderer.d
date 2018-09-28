@@ -10,6 +10,8 @@ import erupted.dispatch_device;
 
 import rebel.renderer.internal.vk;
 
+import std.stdio;
+
 interface IVulkanView : IView {
 	@property PFN_vkGetInstanceProcAddr getVkGetInstanceProcAddr();
 	VkSurfaceKHR createVulkanSurface(VkInstance instance);
@@ -35,7 +37,7 @@ extern (C) static VkBool32 vulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBi
 		""
 	);
 	alias getStyle = (VkDebugUtilsMessageTypeFlagsEXT s) => (cast(VkDebugUtilsMessageTypeFlagBitsEXT)s).predSwitch(
-		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT, ";5",
+		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT, ";4",
 		""
 	);
 	alias getSeverity = (VkDebugUtilsMessageSeverityFlagBitsEXT s) => s.predSwitch(
@@ -81,7 +83,8 @@ extern (C) static VkBool32 vulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBi
 		}
 
 		stderr.writefln("Message:\n\t%s", pCallbackData.pMessage.fromStringz);
-		debug asm pure nothrow @nogc @trusted {
+		version (Int3OnVKError)
+			debug asm pure nothrow @nogc @trusted {
 			int 3;
 		}
 	} catch (Exception) {
@@ -111,10 +114,11 @@ public:
 		_device.dispatch.DeviceWaitIdle();
 
 		_commandBuffers.clear;
-		_shaderModules.clear;
 		_pipelines.clear;
-		_renderPasses.clear;
+		_buffers.clear;
 		_framebuffers.clear;
+		_renderPasses.clear;
+		_shaderModules.clear;
 		_images.clear;
 		_imageTemplates.clear;
 
@@ -201,7 +205,7 @@ public:
 	}
 
 	// dfmt off
-	import std.stdio;
+	Buffer construct(ref BufferBuilder builder) { return _buffers.create(builder, &_device); }
 	CommandBuffer construct(ref CommandBufferBuilder builder) { return _commandBuffers.create(builder, &_device); }
 	Framebuffer construct(ref FramebufferBuilder builder) { return _framebuffers.create(builder, &_device); }
 	Image construct(ref ImageBuilder builder) { return _images.create(builder, &_device); }
@@ -213,6 +217,7 @@ public:
 	// Custom
 	Image construct(ref ImageBuilder builder, VkImage image) { return _images.create(builder, &_device, image); }
 
+	Buffer.Ref get(Buffer handle) { return _buffers.get(handle); }
 	CommandBuffer.Ref get(CommandBuffer handle) { return _commandBuffers.get(handle); }
 	Framebuffer.Ref get(Framebuffer handle) { return _framebuffers.get(handle); }
 	Image.Ref get(Image handle) { return _images.get(handle); }
@@ -221,6 +226,7 @@ public:
 	RenderPass.Ref get(RenderPass handle) { return _renderPasses.get(handle); }
 	ShaderModule.Ref get(ShaderModule handle) { return _shaderModules.get(handle); }
 
+	void destruct(Buffer handle) { assert(!handle.isValid); return _buffers.remove(handle); }
 	void destruct(CommandBuffer handle) { assert(!handle.isValid); return _commandBuffers.remove(handle); }
 	void destruct(Framebuffer handle) { assert(!handle.isValid); return _framebuffers.remove(handle); }
 	void destruct(Image handle) { assert(!handle.isValid); return _images.remove(handle); }
@@ -269,6 +275,7 @@ private:
 
 	VkCommandBuffer[] _submittedCommandBuffers;
 
+	HandleStorage!(Buffer, VKBufferData) _buffers;
 	HandleStorage!(CommandBuffer, VKCommandBufferData) _commandBuffers;
 	HandleStorage!(Framebuffer, VKFramebufferData) _framebuffers;
 	HandleStorage!(Image, VKImageData) _images;
@@ -295,6 +302,7 @@ private:
 
 		cleanup(_commandBuffers);
 		cleanup(_pipelines);
+		cleanup(_buffers);
 		cleanup(_framebuffers);
 		cleanup(_renderPasses);
 		cleanup(_images);
@@ -306,6 +314,7 @@ private:
 		create(_images);
 		create(_renderPasses);
 		create(_framebuffers);
+		create(_buffers);
 		create(_pipelines);
 		create(_commandBuffers);
 

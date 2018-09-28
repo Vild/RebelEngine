@@ -7,6 +7,11 @@ interface IRecordingSectionScope {
 	void defineSubsection(string name, vec4 color);
 }
 
+struct BufferOffset {
+	Buffer buffer;
+	size_t offset;
+}
+
 interface ICommandBufferRecordingState {
 	@property void renderPass(RenderPass renderPass);
 	@property void pipeline(Pipeline pipeline);
@@ -18,6 +23,7 @@ interface ICommandBufferRecordingState {
 
 	scope IRecordingSectionScope defineSectionScope(string name, vec4 color);
 
+	void bindVertexBuffer(uint firstBinding, BufferOffset[] buffers);
 	void draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance);
 }
 

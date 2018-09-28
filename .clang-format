@@ -1,0 +1,15 @@
+---
+Language:        Cpp
+BasedOnStyle:  Chromium
+AccessModifierOffset: -2
+AlignEscapedNewlines: DontAlign
+ColumnLimit:     160
+ConstructorInitializerIndentWidth: 2
+ContinuationIndentWidth: 2
+IndentCaseLabels: false
+SortIncludes:    false
+SpacesBeforeTrailingComments: 1
+TabWidth:        2
+UseTab:          ForIndentation
+...
+

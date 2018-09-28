@@ -101,6 +101,26 @@ final override:
 		return new RecordingSectionScope(name, color);
 	}
 
+	void bindVertexBuffer(uint firstBinding, BufferOffset[] buffers) {
+		import std.range : Chunks, chunks;
+
+		foreach (chunk; buffers.chunks(32)) {
+			VkBuffer[32] buf = void;
+			VkDeviceSize[32] off = void;
+
+			foreach (idx, buffer; chunk) {
+				scope Buffer.Ref bufferRef = cbData.renderer.get(buffer.buffer);
+				VKBufferData* data = bufferRef.get!VKBufferData;
+
+				buf[idx] = data.buffer;
+				off[idx] = buffer.offset;
+			}
+
+			cbData.device.dispatch.vkCmdBindVertexBuffers(cbData.commandBuffer, firstBinding, cast(uint)chunk.length, buf.ptr, off.ptr);
+			firstBinding += chunk.length;
+		}
+	}
+
 	void draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance) {
 		cbData.device.dispatch.vkCmdDraw(cbData.commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 	}

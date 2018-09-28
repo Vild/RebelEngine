@@ -3,15 +3,46 @@ module rebel.renderer.types.imagetemplate;
 import rebel.renderer.types;
 import dlsl.vector;
 
+// TODO: Rename to better generic format name
 enum ImageFormat {
 	undefined,
+
+	rg8_unorm,
+	rg32_float,
+
 	rgb8_unorm,
+	rgb32_float,
+
 	rgba8_unorm,
 	rgba16_float,
 	rgba32_float,
 
 	bgr8_unorm,
 	bgra8_unorm,
+
+	a2r10g10b10_float // HDR
+}
+
+//TODO: move!!
+size_t getBitsPerChannel(ImageFormat f) {
+	final switch (f) {
+	case ImageFormat.undefined:
+		return 0; //TODO: Add assert(0)?
+
+	case ImageFormat.rg8_unorm:
+	case ImageFormat.rgb8_unorm:
+	case ImageFormat.rgba8_unorm:
+	case ImageFormat.bgr8_unorm:
+	case ImageFormat.bgra8_unorm:
+		return 8;
+	case ImageFormat.rgba16_float:
+		return 16;
+	case ImageFormat.rg32_float:
+	case ImageFormat.rgb32_float:
+	case ImageFormat.rgba32_float:
+	case ImageFormat.a2r10g10b10_float:
+		return 32;
+	}
 }
 
 enum ImageUsage {

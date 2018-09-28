@@ -38,9 +38,16 @@ struct VKPipelineData {
 
 		foreach (idx, const VertexInputBindingDescription bind; builder.vertexInputBindingDescriptions) {
 			VkVertexInputBindingDescription* desc = &vertexInputBindingDescriptions[idx];
+			desc.binding = bind.binding;
+			desc.stride = bind.stride;
+			desc.inputRate = bind.inputRate.translate;
 		}
 		foreach (idx, const VertexInputAttributeDescription attr; builder.vertexInputAttributeDescriptions) {
 			VkVertexInputAttributeDescription* desc = &vertexInputAttributeDescriptions[idx];
+			desc.location = attr.location;
+			desc.binding = attr.binding;
+			desc.format = attr.format.translate;
+			desc.offset = attr.offset;
 		}
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo;
