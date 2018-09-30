@@ -19,3 +19,4 @@ imgui.ini
 *~
 CppCode*
 *.spv
+memoryStats.json

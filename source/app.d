@@ -155,9 +155,7 @@ private:
 
 		scope Buffer.Ref data = _renderer.get(_vertexBuffer);
 		BufferData* buffer = data.get();
-		buffer.map();
-		(cast(VkTestShaderDataVertex[])buffer.deviceMemory)[0 .. _vertices.length] = _vertices[];
-		buffer.unmap();
+		buffer.setData(_vertices);
 	}
 
 	void _createPipeline() {

@@ -3,6 +3,8 @@ module rebel.renderer.internal.vk.device;
 import erupted;
 import erupted.dispatch_device;
 
+import vulkan_memory_allocator;
+
 import rebel.engine;
 import rebel.view;
 import rebel.renderer;
@@ -44,6 +46,9 @@ struct VKDevice {
 	// Logical device
 	DispatchDevice dispatch;
 
+	VmaVulkanFunctions vulkanFunctions;
+	VmaAllocator allocator;
+
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
 
@@ -59,6 +64,9 @@ struct VKDevice {
 
 	VkCommandPool defaultCommandPool;
 	VkCommandPool changeEachFrameCommandPool;
+
+	VkCommandBuffer singleTimeCommandBuffer;
+	VkFence singleTimeCommandBufferFence;
 
 	void initialize(VkPhysicalDevice device, QueueInformation queueInfo, SwapChainInformation swapChainInfo, VkSurfaceKHR surface) {
 		import std.string : fromStringz;
@@ -84,6 +92,7 @@ struct VKDevice {
 			physicalSupportedExtensions[idx] = extension.extensionName.ptr.fromStringz.idup;
 
 		_createLogicalDevice();
+		_createMemoryAllocator();
 		_createSwapChain(false);
 		_createImageViews();
 		_createCommandPools();
@@ -93,6 +102,8 @@ struct VKDevice {
 		if (device == VK_NULL_HANDLE) // On opAssign or when the GC, for some reason, calls this destructor
 			return;
 
+		dispatch.DestroyFence(singleTimeCommandBufferFence);
+		dispatch.FreeCommandBuffers(changeEachFrameCommandPool, 1, &singleTimeCommandBuffer);
 		dispatch.DestroyCommandPool(changeEachFrameCommandPool);
 		dispatch.DestroyCommandPool(defaultCommandPool);
 
@@ -105,6 +116,7 @@ struct VKDevice {
 		renderer.destruct(fbImageTemplate);*/
 
 		dispatch.DestroySwapchainKHR(swapChain);
+		vmaDestroyAllocator(allocator);
 		dispatch.DestroyDevice();
 		device = VK_NULL_HANDLE;
 	}
@@ -135,6 +147,24 @@ struct VKDevice {
 
 	void recreate() {
 		_createSwapChain(true);
+	}
+
+	VkCommandBuffer beginSingleTimeCommands() {
+		VkCommandBufferBeginInfo cmdBufBeginInfo;
+		cmdBufBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		vkAssert(dispatch.vkBeginCommandBuffer(singleTimeCommandBuffer, &cmdBufBeginInfo));
+		return singleTimeCommandBuffer;
+	}
+
+	void endSingleTimeCommands() {
+		vkAssert(dispatch.vkEndCommandBuffer(singleTimeCommandBuffer));
+
+		VkSubmitInfo submitInfo;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &singleTimeCommandBuffer;
+
+		vkAssert(dispatch.vkQueueSubmit(graphicsQueue, 1, &submitInfo, singleTimeCommandBufferFence));
+		vkAssert(dispatch.WaitForFences(1, &singleTimeCommandBufferFence, true, size_t.max));
 	}
 
 private:
@@ -184,6 +214,34 @@ private:
 			assert(presentQueue, "Present queue is null!");
 			setVkObjectName(&this, VK_OBJECT_TYPE_QUEUE, presentQueue, "Present Queue");
 		}
+	}
+
+	void _createMemoryAllocator() {
+		vulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+		vulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+		vulkanFunctions.vkAllocateMemory = dispatch.vkAllocateMemory;
+		vulkanFunctions.vkFreeMemory = dispatch.vkFreeMemory;
+		vulkanFunctions.vkMapMemory = dispatch.vkMapMemory;
+		vulkanFunctions.vkUnmapMemory = dispatch.vkUnmapMemory;
+		vulkanFunctions.vkFlushMappedMemoryRanges = dispatch.vkFlushMappedMemoryRanges;
+		vulkanFunctions.vkInvalidateMappedMemoryRanges = dispatch.vkInvalidateMappedMemoryRanges;
+		vulkanFunctions.vkBindBufferMemory = dispatch.vkBindBufferMemory;
+		vulkanFunctions.vkBindImageMemory = dispatch.vkBindImageMemory;
+		vulkanFunctions.vkGetBufferMemoryRequirements = dispatch.vkGetBufferMemoryRequirements;
+		vulkanFunctions.vkGetImageMemoryRequirements = dispatch.vkGetImageMemoryRequirements;
+		vulkanFunctions.vkCreateBuffer = dispatch.vkCreateBuffer;
+		vulkanFunctions.vkDestroyBuffer = dispatch.vkDestroyBuffer;
+		vulkanFunctions.vkCreateImage = dispatch.vkCreateImage;
+		vulkanFunctions.vkDestroyImage = dispatch.vkDestroyImage;
+		vulkanFunctions.vkGetBufferMemoryRequirements2 = dispatch.vkGetBufferMemoryRequirements2;
+		vulkanFunctions.vkGetImageMemoryRequirements2 = dispatch.vkGetImageMemoryRequirements2;
+
+		VmaAllocatorCreateInfo allocatorInfo;
+		allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
+		allocatorInfo.physicalDevice = device;
+		allocatorInfo.device = dispatch.vkDevice;
+		allocatorInfo.pVulkanFunctions = &vulkanFunctions;
+		vmaCreateAllocator(&allocatorInfo, &allocator);
 	}
 
 	void _createSwapChain(bool recreate) {
@@ -341,5 +399,16 @@ private:
 		poolInfo.flags |= VkCommandPoolCreateFlagBits.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 		vkAssert(dispatch.CreateCommandPool(&poolInfo, &changeEachFrameCommandPool));
 		setVkObjectName(&this, VK_OBJECT_TYPE_COMMAND_POOL, changeEachFrameCommandPool, "Change Each Frame CommandPool");
+
+		VkCommandBufferAllocateInfo allocInfo;
+		allocInfo.commandPool = changeEachFrameCommandPool;
+		allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = 1;
+		vkAssert(dispatch.AllocateCommandBuffers(&allocInfo, &singleTimeCommandBuffer));
+		setVkObjectName(&this, VK_OBJECT_TYPE_COMMAND_BUFFER, singleTimeCommandBuffer, "Single time commandbuffer");
+
+		VkFenceCreateInfo fenceInfo;
+		vkAssert(dispatch.CreateFence(&fenceInfo, &singleTimeCommandBufferFence));
+		setVkObjectName(&this, VK_OBJECT_TYPE_FENCE, singleTimeCommandBufferFence, "Single time commandbuffer - fence");
 	}
 }

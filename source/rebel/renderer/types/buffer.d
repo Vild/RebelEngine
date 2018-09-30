@@ -19,11 +19,10 @@ struct BufferBuilder {
 }
 
 struct BufferData {
-	void[] deviceMemory;
+	//	void[] deviceMemory;
 
-	// TODO: Make more fancy (RAII?)
-	void[] delegate() map;
-	void delegate() unmap;
+	void[]delegate(void[] outputBuffer) getData;
+	void delegate(void[] data) setData;
 }
 
 alias Buffer = Handle!(BufferData, 64);

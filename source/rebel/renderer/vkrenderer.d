@@ -10,6 +10,8 @@ import erupted.dispatch_device;
 
 import rebel.renderer.internal.vk;
 
+import vulkan_memory_allocator;
+
 import std.stdio;
 
 interface IVulkanView : IView {
@@ -202,6 +204,21 @@ public:
 			vkAssert(result);
 
 		_currentFrame = (_currentFrame + 1) % _imageAvailableSemaphores.length;
+
+		static bool done;
+		if (!done) {
+			done = true;
+			char* str;
+
+			vmaBuildStatsString(_device.allocator, &str, true);
+			scope (exit)
+				vmaFreeStatsString(_device.allocator, str);
+
+			import std.file : write;
+			import std.string : fromStringz;
+
+			write("memoryStats.json", str.fromStringz);
+		}
 	}
 
 	// dfmt off

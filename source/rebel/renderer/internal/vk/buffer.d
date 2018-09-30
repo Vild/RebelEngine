@@ -2,6 +2,7 @@ module rebel.renderer.internal.vk.buffer;
 
 import rebel.renderer;
 import erupted;
+import vulkan_memory_allocator;
 
 import rebel.renderer.internal.vk;
 
@@ -13,11 +14,12 @@ struct VKBufferData {
 	VKDevice* device;
 
 	VkBuffer buffer;
-	VkDeviceMemory memory;
+	VmaAllocation allocation;
+	VmaAllocationInfo allocationInfo;
 
 	this(const ref BufferBuilder builder, VKDevice* device) {
-		base.map = &map;
-		base.unmap = &unmap;
+		base.getData = &getData;
+		base.setData = &setData;
 		this.builder = builder;
 		this.device = device;
 		create();
@@ -26,24 +28,18 @@ struct VKBufferData {
 	void create() {
 		VkBufferCreateInfo createInfo;
 		createInfo.size = builder.size;
-		createInfo.usage = builder.usage.translate;
+		createInfo.usage = builder.usage.translate | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		createInfo.sharingMode = builder.sharing.translate;
 
-		vkAssert(device.dispatch.CreateBuffer(&createInfo, &buffer), "Failed to create buffer!");
+		VmaAllocationCreateInfo allocInfo;
+		allocInfo.usage = VmaMemoryUsage.VMA_MEMORY_USAGE_GPU_ONLY;
+		allocInfo.flags = VmaAllocationCreateFlagBits.VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+		vkAssert(vmaCreateBuffer(device.allocator, &createInfo, &allocInfo, &buffer, &allocation, &allocationInfo),
+				"Failed to create buffer!");
+
 		setVkObjectName(device, VK_OBJECT_TYPE_BUFFER, buffer, builder.name);
-
-		VkMemoryRequirements memRequirements;
-		device.dispatch.GetBufferMemoryRequirements(buffer, &memRequirements);
-
-		VkMemoryAllocateInfo allocInfo;
-		allocInfo.allocationSize = memRequirements.size;
-		allocInfo.memoryTypeIndex = device.getMemoryType(memRequirements.memoryTypeBits,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-		vkAssert(device.dispatch.AllocateMemory(&allocInfo, &memory), "Failed to allocate buffer memory!");
-		setVkObjectName(device, VK_OBJECT_TYPE_DEVICE_MEMORY, memory, builder.name);
-
-		vkAssert(device.dispatch.BindBufferMemory(buffer, memory, 0), "Failed to bind memory to buffer");
+		setVkObjectName(device, VK_OBJECT_TYPE_DEVICE_MEMORY, allocationInfo.deviceMemory, builder.name);
 	}
 
 	~this() {
@@ -54,26 +50,72 @@ struct VKBufferData {
 	}
 
 	void cleanup() {
-		device.dispatch.DestroyBuffer(buffer);
-		device.dispatch.FreeMemory(memory);
+		vmaDestroyBuffer(device.allocator, buffer, allocation);
 	}
 
-	private size_t refCounter;
-	void[] map() {
-		if (!refCounter) {
-			void* ptr;
-			vkAssert(device.dispatch.MapMemory(memory, 0, builder.size, 0, &ptr), "Failed to map memory");
-			base.deviceMemory = ptr[0 .. builder.size];
+	struct StagingBuffer {
+		VkBuffer buffer;
+
+		VmaAllocation allocation;
+		VmaAllocationInfo allocationInfo;
+	}
+
+	StagingBuffer createStaging() {
+		StagingBuffer ret;
+		VkBufferCreateInfo createInfo;
+		createInfo.size = builder.size;
+		createInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VmaAllocationCreateInfo allocInfo;
+		allocInfo.usage = VmaMemoryUsage.VMA_MEMORY_USAGE_CPU_ONLY;
+		allocInfo.flags = VmaAllocationCreateFlagBits.VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+		vkAssert(vmaCreateBuffer(device.allocator, &createInfo, &allocInfo, &ret.buffer, &ret.allocation,
+				&ret.allocationInfo), "Failed to create buffer!");
+
+		setVkObjectName(device, VK_OBJECT_TYPE_BUFFER, buffer, "Staging buffer");
+		setVkObjectName(device, VK_OBJECT_TYPE_DEVICE_MEMORY, allocationInfo.deviceMemory, "Staging buffer");
+		return ret;
+	}
+
+	//TODO: add staging buffer, if needed
+	void[] getData(void[] outputBuffer) {
+		import std.algorithm : min;
+
+		size_t maxSize = min(allocationInfo.size, outputBuffer.length);
+
+		if (allocationInfo.pMappedData)
+			outputBuffer[0 .. maxSize] = allocationInfo.pMappedData[0 .. maxSize];
+		else {
+			assert(0);
+			//void* ptr;
+			//vkAssert(vmaMapMemory(device.allocator, allocation, &ptr), "Failed to map memory");
+			//vmaUnmapMemory(device.allocator, allocation);
 		}
-		refCounter++;
-		return base.deviceMemory;
+		return outputBuffer;
 	}
 
-	void unmap() {
-		refCounter--;
-		if (!refCounter) {
-			device.dispatch.UnmapMemory(memory);
-			base.deviceMemory = null;
+	void setData(void[] data) {
+		import std.algorithm : min;
+
+		size_t maxSize = min(allocationInfo.size, data.length);
+		if (allocationInfo.pMappedData) {
+			allocationInfo.pMappedData[0 .. maxSize] = data[0 .. maxSize];
+		} else {
+			StagingBuffer staging = createStaging();
+			assert(staging.allocationInfo.pMappedData);
+			staging.allocationInfo.pMappedData[0 .. maxSize] = data[0 .. maxSize];
+
+			auto cb = device.beginSingleTimeCommands();
+			VkBufferCopy region;
+			region.srcOffset = 0;
+			region.dstOffset = 0;
+			region.size = builder.size;
+			device.dispatch.vkCmdCopyBuffer(cb, staging.buffer, buffer, 1, &region);
+			device.endSingleTimeCommands();
+
+			vmaDestroyBuffer(device.allocator, staging.buffer, staging.allocation);
 		}
 	}
 }

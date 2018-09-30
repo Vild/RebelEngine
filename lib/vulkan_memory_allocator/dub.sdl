@@ -1,0 +1,13 @@
+name "vulkan_memory_allocator"
+targetType "library"
+targetPath "../../bin"
+
+importPaths "source"
+sourcePaths "source"
+
+dependency "erupted" version="~>2.0.9+v1.1.83"
+
+lflags "./lib/vulkan_memory_allocator/libVulkanMemoryAllocator.a"
+libs "stdc++"
+
+preBuildCommands "cd lib/vulkan_memory_allocator; rdmd buildlib.d"

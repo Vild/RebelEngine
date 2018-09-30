@@ -9,7 +9,9 @@ targetPath "bin/"
 lflags "-rpath=3rdparty/DerelictImgui/cimgui/cimgui" platform="posix"
 
 subPackage "lib/imgui_extensions"
+subPackage "lib/vulkan_memory_allocator"
 dependency ":imgui_extensions" version="*"
+dependency ":vulkan_memory_allocator" version="*"
 
 # Rendering
 dependency "derelict-sdl2" version="~>3.1.0-alpha.4"

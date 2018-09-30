@@ -2,6 +2,7 @@ module rebel.renderer.internal.vk.image;
 
 import rebel.renderer;
 import erupted;
+import vulkan_memory_allocator;
 import rebel.engine;
 
 import rebel.renderer.internal.vk;
@@ -15,7 +16,8 @@ struct VKImageData {
 
 	bool ownsImage = true;
 	VkImage image;
-	VkDeviceMemory memory;
+	VmaAllocation allocation;
+	VmaAllocationInfo allocationInfo;
 	VkImageView view;
 
 	this(ref ImageBuilder builder, VKDevice* device, VkImage image = VK_NULL_HANDLE) {
@@ -44,19 +46,12 @@ struct VKImageData {
 			imageCreate.tiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL;
 			imageCreate.usage = data.usage | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-			vkAssert(device.dispatch.CreateImage(&imageCreate, &image));
+			VmaAllocationCreateInfo allocInfo;
+			allocInfo.flags = VmaMemoryUsage.VMA_MEMORY_USAGE_GPU_ONLY;
+
+			vkAssert(vmaCreateImage(device.allocator, &imageCreate, &allocInfo, &image, &allocation, &allocationInfo), "Failed to create Image");
 			setVkObjectName(device, VK_OBJECT_TYPE_IMAGE, image, builder.name);
-
-			VkMemoryRequirements memReqs;
-			device.dispatch.GetImageMemoryRequirements(image, &memReqs);
-
-			VkMemoryAllocateInfo memAlloc;
-			memAlloc.allocationSize = memReqs.size;
-			memAlloc.memoryTypeIndex = device.getMemoryType(memReqs.memoryTypeBits, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-			vkAssert(device.dispatch.AllocateMemory(&memAlloc, &memory));
-			vkAssert(device.dispatch.BindImageMemory(image, memory, 0));
-
-			setVkObjectName(device, VK_OBJECT_TYPE_DEVICE_MEMORY, memory, builder.name);
+			setVkObjectName(device, VK_OBJECT_TYPE_DEVICE_MEMORY, allocationInfo.deviceMemory, builder.name);
 		}
 
 		VkImageViewCreateInfo createinfo;
@@ -73,7 +68,7 @@ struct VKImageData {
 		createinfo.subresourceRange.baseArrayLayer = 0;
 		createinfo.subresourceRange.layerCount = 1;
 		createinfo.image = image;
-		vkAssert(device.dispatch.CreateImageView(&createinfo, &view));
+		vkAssert(device.dispatch.CreateImageView(&createinfo, &view), "Failed to create ImageView");
 		setVkObjectName(device, VK_OBJECT_TYPE_IMAGE_VIEW, view, builder.name);
 	}
 
@@ -86,10 +81,8 @@ struct VKImageData {
 
 	void cleanup() {
 		device.dispatch.DestroyImageView(view);
-		if (ownsImage) {
-			device.dispatch.FreeMemory(memory);
-			device.dispatch.DestroyImage(image);
-		}
+		if (ownsImage)
+			vmaDestroyImage(device.allocator, image, allocation);
 	}
 }
 
