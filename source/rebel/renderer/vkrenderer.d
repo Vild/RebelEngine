@@ -139,7 +139,6 @@ public:
 	}
 
 	void newFrame() {
-		_device.dispatch.DeviceWaitIdle();
 		_device.dispatch.WaitForFences(1, &_inFlightFences[_currentFrame], true, size_t.max);
 
 		VkResult result = _device.dispatch.AcquireNextImageKHR(_device.swapChain, size_t.max,
