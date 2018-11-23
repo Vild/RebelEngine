@@ -1,7 +1,7 @@
 module rebel.renderer.types.image;
 
 import rebel.renderer.types;
-import dlsl.vector;
+import gfm.math.vector;
 
 struct ImageBuilder {
 	string name;

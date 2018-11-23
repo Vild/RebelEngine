@@ -1,7 +1,7 @@
 module rebel.renderer;
 
 import rebel.view;
-import dlsl.vector;
+import gfm.math.vector;
 
 import rebel.handle;
 
@@ -18,12 +18,12 @@ enum RendererType {
 
 // TODO: (re)move
 interface ITexture2D {
-	@property ivec2 getSize();
+	@property vec2i getSize();
 	@property void* getHandle();
 }
 
 interface ITexture3D {
-	@property ivec3 getSize();
+	@property vec3f getSize();
 	@property void* getHandle();
 }
 

@@ -9,7 +9,7 @@ import derelict.sdl2.sdl;
 
 //public import derelict.sdl2.image;
 
-import dlsl.vector;
+import gfm.math.vector;
 
 shared static this() {
 	DerelictSDL2.load();
@@ -29,7 +29,7 @@ void sdlAssert(T, Args...)(T cond, Args args) {
 
 final class SDLView : IView, IVulkanView, IOpenGLView {
 public:
-	this(string title, ivec2 size) {
+	this(string title, vec2i size) {
 		_title = title;
 		_size = size;
 	}
@@ -166,19 +166,19 @@ public:
 		return _quit;
 	}
 
-	@property ivec2 size() {
+	@property vec2i size() {
 		int x, y;
 		SDL_GetWindowSize(_window, &x, &y);
-		return ivec2(x, y);
+		return vec2i(x, y);
 	}
 
-	@property ivec2 drawableSize() {
+	@property vec2i drawableSize() {
 		int x, y;
 		if (_rendererType == RendererType.vulkan)
 			SDL_Vulkan_GetDrawableSize(_window, &x, &y);
 		else if (_rendererType == RendererType.opengl)
 			SDL_GL_GetDrawableSize(_window, &x, &y);
-		return ivec2(x, y);
+		return vec2i(x, y);
 	}
 
 	@property bool vsync() const {
@@ -220,7 +220,7 @@ private:
 	string _title;
 	bool _quit;
 	bool _vsync;
-	ivec2 _size;
+	vec2i _size;
 
 	IRenderer _renderer;
 	RendererType _rendererType;

@@ -12,7 +12,7 @@ import rebel.input.key;
 import derelict.imgui.imgui;
 import derelict.sdl2.sdl;
 
-import dlsl.vector;
+import gfm.math.vector;
 
 import opengl.gl4;
 
@@ -130,8 +130,8 @@ public:
 		ImGuiIO* io = igGetIO();
 
 		// Setup display size (every frame to accommodate for window resizing)
-		ivec2 size = _view.size;
-		ivec2 displaySize = _view.drawableSize;
+		vec2i size = _view.size;
+		vec2i displaySize = _view.drawableSize;
 
 		io.DisplaySize = ImVec2(displaySize.x, displaySize.y);
 		io.DisplayFramebufferScale = ImVec2(size.x > 0 ? (cast(float)displaySize.x / size.x) : 0, size.y > 0
@@ -244,7 +244,7 @@ public:
 					igDrawSplitter(false, style.WindowPadding.x, &viewportSizeWidth, &rightPanelSizeWidth, 150, 150);
 					if (_worldView) { // Center
 						ImVec2 drawAreaSize = ImVec2(viewportSizeWidth, viewportSizeHeight);
-						_worldView.drawAreaSize = ivec2(cast(int)drawAreaSize.x, cast(int)drawAreaSize.y);
+						_worldView.drawAreaSize = vec2i(cast(int)drawAreaSize.x, cast(int)drawAreaSize.y);
 						igImage(*cast(ImTextureID*)_worldView.getRendereredFrame().getHandle(), drawAreaSize);
 					}
 					igSameLine();

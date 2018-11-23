@@ -6,14 +6,14 @@ import rebel.engine;
 
 import rebel.renderer.internal.vk;
 
-import dlsl.vector;
+import gfm.math.vector;
 import std.typecons;
 
 final class RecordingSectionScope : IRecordingSectionScope {
 public:
 	VKCommandBufferData* cbData;
 
-	this(string name, vec4 color) {
+	this(string name, vec4f color) {
 		import std.string : toStringz;
 
 		VkDebugUtilsLabelEXT label;
@@ -27,7 +27,7 @@ public:
 	}
 
 final override:
-	void defineSubsection(string name, vec4 color) {
+	void defineSubsection(string name, vec4f color) {
 		import std.string : toStringz;
 
 		VkDebugUtilsLabelEXT label;
@@ -42,6 +42,10 @@ public:
 	VKCommandBufferData* cbData;
 
 final override:
+	@property void index(size_t index) {
+		cbData.index = index;
+	}
+
 	@property void renderPass(RenderPass renderPass) {
 		cbData.renderPass = renderPass;
 	}
@@ -54,11 +58,11 @@ final override:
 		cbData.framebuffer = framebuffer;
 	}
 
-	@property void renderArea(uvec4 renderArea) {
+	@property void renderArea(vec4ui renderArea) {
 		cbData.renderArea = renderArea;
 	}
 
-	@property void clearColors(vec4[] clearColors) {
+	@property void clearColors(vec4f[] clearColors) {
 		cbData.clearColors = clearColors;
 	}
 
@@ -75,7 +79,7 @@ final override:
 		}
 		VkClearValue[] clearValues;
 		clearValues.length = cbData.clearColors.length;
-		foreach (i, vec4 color; cbData.clearColors)
+		foreach (i, vec4f color; cbData.clearColors)
 			clearValues[i].color = VkClearColorValue([color.r, color.g, color.b, color.a]);
 
 		VkRenderPassBeginInfo info;
@@ -87,16 +91,16 @@ final override:
 
 		cbData.device.dispatch.vkCmdBeginRenderPass(cbData.commandBuffer, &info, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 
-		VkPipeline p;
+		VKPipelineData* p;
 		{
 			scope Pipeline.Ref pRef = cbData.renderer.get(cbData.pipeline);
-			p = pRef.get!VKPipelineData().pipeline;
+			p = pRef.get!VKPipelineData();
 		}
 
-		cbData.device.dispatch.vkCmdBindPipeline(cbData.commandBuffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, p);
+		cbData.device.dispatch.vkCmdBindPipeline(cbData.commandBuffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, p.pipeline);
 	}
 
-	scope IRecordingSectionScope defineSectionScope(string name, vec4 color) {
+	scope IRecordingSectionScope defineSectionScope(string name, vec4f color) {
 		//TODO: Add pool allocator
 		return new RecordingSectionScope(name, color);
 	}
@@ -121,8 +125,33 @@ final override:
 		}
 	}
 
+	void bindIndexBuffer(BufferOffset buffer, IndexType type) {
+		scope Buffer.Ref bufferRef = cbData.renderer.get(buffer.buffer);
+		VKBufferData* data = bufferRef.get!VKBufferData;
+
+		cbData.device.dispatch.vkCmdBindIndexBuffer(cbData.commandBuffer, data.buffer, buffer.offset, type.translate);
+	}
+
 	void draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance) {
+		VKPipelineData* p;
+		{
+			scope Pipeline.Ref pRef = cbData.renderer.get(cbData.pipeline);
+			p = pRef.get!VKPipelineData();
+		}
+		cbData.device.dispatch.vkCmdBindDescriptorSets(cbData.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				p.pipelineLayout, 0, 1, &p.descriptorSets[cbData.index], 0, null);
 		cbData.device.dispatch.vkCmdDraw(cbData.commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+	}
+
+	void drawIndexed(uint indexCount, uint instanceCount, uint firstIndex, uint vertexOffset, uint firstInstance) {
+		VKPipelineData* p;
+		{
+			scope Pipeline.Ref pRef = cbData.renderer.get(cbData.pipeline);
+			p = pRef.get!VKPipelineData();
+		}
+		cbData.device.dispatch.vkCmdBindDescriptorSets(cbData.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				p.pipelineLayout, 0, 1, &p.descriptorSets[cbData.index], 0, null);
+		cbData.device.dispatch.vkCmdDrawIndexed(cbData.commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 }
 
@@ -139,11 +168,12 @@ struct VKCommandBufferData {
 	VkCommandPool pool;
 	VkCommandBuffer commandBuffer;
 
+	size_t index;
 	RenderPass renderPass;
 	Pipeline pipeline;
 	Framebuffer framebuffer;
-	uvec4 renderArea;
-	vec4[] clearColors;
+	vec4ui renderArea;
+	vec4f[] clearColors;
 
 	this(const ref CommandBufferBuilder builder, VKDevice* device) {
 		this.builder = builder;

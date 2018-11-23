@@ -1,7 +1,7 @@
 module rebel.renderer.types.imagetemplate;
 
 import rebel.renderer.types;
-import dlsl.vector;
+import gfm.math.vector;
 
 // TODO: Rename to better generic format name
 enum ImageFormat {
@@ -72,7 +72,7 @@ struct ImageTemplateBuilder {
 	string name;
 	ImageFormat format;
 	ImageUsage usage;
-	uvec2 size;
+	vec2ui size;
 	ubyte samples = 1;
 	bool readOnly;
 }
@@ -81,7 +81,7 @@ struct ImageTemplateData {
 	ImageFormat format;
 	ImageUsage usage;
 	ImageLayout layout;
-	uvec2 size;
+	vec2ui size;
 	ubyte samples = 1;
 	bool readOnly;
 }

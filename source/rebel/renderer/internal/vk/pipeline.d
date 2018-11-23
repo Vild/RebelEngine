@@ -13,8 +13,11 @@ struct VKPipelineData {
 	PipelineBuilder builder;
 	VKDevice* device;
 
+	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
+
+	VkDescriptorSet[] descriptorSets;
 
 	this(ref PipelineBuilder builder, VKDevice* device) {
 		this.builder = builder;
@@ -119,7 +122,28 @@ struct VKPipelineData {
 		colorBlending.attachmentCount = cast(uint)colorBlendAttachments.length;
 		colorBlending.blendConstants[] = builder.blendState.blendConstants[];
 
+		VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings;
+		descriptorSetLayoutBindings.length = builder.descriptorSetLayoutBindings.length;
+
+		foreach (idx, const DescriptorSetLayoutBinding bind; builder.descriptorSetLayoutBindings) {
+			VkDescriptorSetLayoutBinding* desc = &descriptorSetLayoutBindings[idx];
+			desc.binding = bind.binding;
+			desc.descriptorCount = bind.descriptorCount;
+			desc.descriptorType = bind.descriptorType.translate;
+			desc.stageFlags = bind.stages.translate;
+			desc.pImmutableSamplers = cast(const(VkSampler)*)bind.immutableSamplers;
+		}
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo;
+		layoutInfo.bindingCount = cast(uint)descriptorSetLayoutBindings.length;
+		layoutInfo.pBindings = descriptorSetLayoutBindings.ptr;
+
+		vkAssert(device.dispatch.CreateDescriptorSetLayout(&layoutInfo, &descriptorSetLayout));
+		setVkObjectName(device, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, descriptorSetLayout, builder.name);
+
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo;
+		pipelineLayoutInfo.setLayoutCount = 1; //TODO: Multiple?
+		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 		vkAssert(device.dispatch.CreatePipelineLayout(&pipelineLayoutInfo, &pipelineLayout));
 		setVkObjectName(device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, pipelineLayout, builder.name);
 
@@ -147,6 +171,42 @@ struct VKPipelineData {
 
 		vkAssert(device.dispatch.CreateGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, &pipeline));
 		setVkObjectName(device, VK_OBJECT_TYPE_PIPELINE, pipeline, builder.name);
+
+		////////
+
+		VkDescriptorSetLayout[] layouts;
+		layouts.length = device.swapChainImages.length;
+		layouts[] = descriptorSetLayout;
+
+		VkDescriptorSetAllocateInfo allocInfo;
+		allocInfo.descriptorPool = device.descriptorPool;
+		allocInfo.descriptorSetCount = cast(uint)device.swapChainImages.length;
+		allocInfo.pSetLayouts = layouts.ptr;
+
+		descriptorSets.length = device.swapChainImages.length;
+		vkAssert(device.dispatch.AllocateDescriptorSets(&allocInfo, descriptorSets.ptr));
+
+		assert(builder.descriptorBufferInfos.length == device.swapChainImages.length);
+		VkDescriptorBufferInfo[] bufferInfos;
+		bufferInfos.length = builder.descriptorBufferInfos.length;
+		VkWriteDescriptorSet[] descriptorWrites;
+		descriptorWrites.length = builder.descriptorBufferInfos.length;
+
+		foreach (size_t i, DescriptorBufferInfo info; builder.descriptorBufferInfos) {
+			VkDescriptorBufferInfo* bufferInfo = &bufferInfos[i];
+			bufferInfo.buffer = renderer.get(info.buffer).get!VKBufferData().buffer;
+			bufferInfo.offset = info.offset;
+			bufferInfo.range = info.range;
+
+			VkWriteDescriptorSet* descriptorWrite = &descriptorWrites[i];
+			descriptorWrite.dstSet = descriptorSets[i];
+			descriptorWrite.dstBinding = info.writeDescriptorSet.binding;
+			descriptorWrite.dstArrayElement = info.writeDescriptorSet.arrayElement;
+			descriptorWrite.descriptorCount = info.writeDescriptorSet.descriptorCount;
+			descriptorWrite.descriptorType = info.writeDescriptorSet.descriptorType.translate;
+			descriptorWrite.pBufferInfo = bufferInfo;
+		}
+		device.dispatch.UpdateDescriptorSets(cast(uint)descriptorWrites.length, descriptorWrites.ptr, 0, null);
 	}
 
 	~this() {
@@ -157,8 +217,10 @@ struct VKPipelineData {
 	}
 
 	void cleanup() {
+		device.dispatch.FreeDescriptorSets(device.descriptorPool, cast(uint)descriptorSets.length, descriptorSets.ptr);
 		device.dispatch.DestroyPipeline(pipeline);
 		device.dispatch.DestroyPipelineLayout(pipelineLayout);
+		device.dispatch.DestroyDescriptorSetLayout(descriptorSetLayout);
 	}
 }
 

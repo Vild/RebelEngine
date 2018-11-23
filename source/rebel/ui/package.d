@@ -3,13 +3,13 @@ module rebel.ui;
 import rebel.input.event;
 import rebel.renderer;
 
-import dlsl.vector;
+import gfm.math.vector;
 
 interface IUIView {
 	ITexture2D getRendereredFrame();
 
-	@property ivec2 drawAreaSize();
-	@property void drawAreaSize(ivec2 size);
+	@property vec2i drawAreaSize();
+	@property void drawAreaSize(vec2i size);
 }
 
 interface IUIRenderer {

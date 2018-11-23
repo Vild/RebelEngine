@@ -11,7 +11,7 @@ import rebel.renderer;
 import rebel.renderer.vkrenderer;
 import rebel.renderer.internal.vk;
 
-import dlsl.vector;
+import gfm.math.vector;
 
 struct QueueInformation {
 	uint graphics = uint.max;
@@ -68,6 +68,8 @@ struct VKDevice {
 	VkCommandBuffer singleTimeCommandBuffer;
 	VkFence singleTimeCommandBufferFence;
 
+	VkDescriptorPool descriptorPool;
+
 	void initialize(VkPhysicalDevice device, QueueInformation queueInfo, SwapChainInformation swapChainInfo, VkSurfaceKHR surface) {
 		import std.string : fromStringz;
 
@@ -96,11 +98,14 @@ struct VKDevice {
 		_createSwapChain(false);
 		_createImageViews();
 		_createCommandPools();
+		_createDescriptorPools();
 	}
 
 	~this() {
 		if (device == VK_NULL_HANDLE) // On opAssign or when the GC, for some reason, calls this destructor
 			return;
+
+		dispatch.DestroyDescriptorPool(descriptorPool);
 
 		dispatch.DestroyFence(singleTimeCommandBufferFence);
 		dispatch.FreeCommandBuffers(changeEachFrameCommandPool, 1, &singleTimeCommandBuffer);
@@ -165,6 +170,7 @@ struct VKDevice {
 
 		vkAssert(dispatch.vkQueueSubmit(graphicsQueue, 1, &submitInfo, singleTimeCommandBufferFence));
 		vkAssert(dispatch.WaitForFences(1, &singleTimeCommandBufferFence, true, size_t.max));
+		vkAssert(dispatch.ResetFences(1, &singleTimeCommandBufferFence));
 	}
 
 private:
@@ -295,13 +301,13 @@ private:
 			scope ImageTemplate.Ref itRef = renderer.get(fbImageTemplate);
 			auto data = itRef.get!VKImageTemplateData();
 			data.builder.format = swapChainImageFormat.format.translate;
-			data.builder.size = uvec2(swapChainExtent.width, swapChainExtent.height);
+			data.builder.size = vec2ui(swapChainExtent.width, swapChainExtent.height);
 		} else {
 			ImageTemplateBuilder builder;
 			builder.name = "SwapChain Image Template";
 			builder.format = swapChainImageFormat.format.translate;
 			builder.samples = 1;
-			builder.size = uvec2(swapChainExtent.width, swapChainExtent.height);
+			builder.size = vec2ui(swapChainExtent.width, swapChainExtent.height);
 			builder.usage = ImageUsage.presentAttachment;
 
 			fbImageTemplate = renderer.construct(builder);
@@ -382,7 +388,7 @@ private:
 			FramebufferBuilder builder;
 			builder.name = format("Framebuffer for output #%d", i);
 			builder.attachments = [image];
-			builder.dimension = uvec3(swapChainExtent.width, swapChainExtent.height, 1);
+			builder.dimension = vec3ui(swapChainExtent.width, swapChainExtent.height, 1);
 			builder.renderPass = fbRenderPass;
 			framebuffers[i] = renderer.construct(builder);
 		}
@@ -400,6 +406,7 @@ private:
 		vkAssert(dispatch.CreateCommandPool(&poolInfo, &changeEachFrameCommandPool));
 		setVkObjectName(&this, VK_OBJECT_TYPE_COMMAND_POOL, changeEachFrameCommandPool, "Change Each Frame CommandPool");
 
+		// TODO: Move to a better place
 		VkCommandBufferAllocateInfo allocInfo;
 		allocInfo.commandPool = changeEachFrameCommandPool;
 		allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -410,5 +417,17 @@ private:
 		VkFenceCreateInfo fenceInfo;
 		vkAssert(dispatch.CreateFence(&fenceInfo, &singleTimeCommandBufferFence));
 		setVkObjectName(&this, VK_OBJECT_TYPE_FENCE, singleTimeCommandBufferFence, "Single time commandbuffer - fence");
+	}
+
+	void _createDescriptorPools() {
+		VkDescriptorPoolSize[] poolSizes = [VkDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, cast(uint)swapChainImages.length)];
+
+		VkDescriptorPoolCreateInfo poolInfo;
+		poolInfo.poolSizeCount = cast(uint)poolSizes.length;
+		poolInfo.pPoolSizes = poolSizes.ptr;
+		poolInfo.maxSets = cast(uint)swapChainImages.length;
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+
+		vkAssert(dispatch.CreateDescriptorPool(&poolInfo, &descriptorPool));
 	}
 }

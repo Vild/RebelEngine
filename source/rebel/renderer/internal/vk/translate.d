@@ -29,15 +29,15 @@ VkFormat translate(ImageFormat format) {
 		return VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
 
 	case ImageFormat.a2r10g10b10_float:
-	return VkFormat.VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+		return VkFormat.VK_FORMAT_A2R10G10B10_UNORM_PACK32;
 	}
 }
 
-VkVertexInputRate translate(DataRate dr) {
+VkVertexInputRate translate(VertexDataRate dr) {
 	final switch (dr) {
-	case DataRate.vertex:
+	case VertexDataRate.vertex:
 		return VK_VERTEX_INPUT_RATE_VERTEX;
-	case DataRate.instance:
+	case VertexDataRate.instance:
 		return VK_VERTEX_INPUT_RATE_INSTANCE;
 	}
 }
@@ -201,6 +201,15 @@ VkSampleCountFlagBits translate(SampleCount cm) {
 VkColorComponentFlagBits translate(ColorComponent cp) {
 	VkColorComponentFlagBits output;
 
+	// Force a compile time error if the enum member is not handled!
+	final switch (cp) {
+	case ColorComponent.r:
+	case ColorComponent.g:
+	case ColorComponent.b:
+	case ColorComponent.a:
+		break;
+	}
+
 	if (cp & ColorComponent.r)
 		output |= VkColorComponentFlagBits.VK_COLOR_COMPONENT_R_BIT;
 	if (cp & ColorComponent.g)
@@ -236,8 +245,20 @@ VkImageUsageFlags translate(ImageUsage iu) {
 VkBufferUsageFlags translate(BufferUsage bu) {
 	VkBufferUsageFlags output;
 
+	// Force a compile time error if the enum member is not handled!
+	final switch (bu) {
+	case BufferUsage.vertex:
+	case BufferUsage.index:
+	case BufferUsage.uniform:
+		break;
+	}
+
 	if (bu & BufferUsage.vertex)
 		output |= VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	if (bu & BufferUsage.index)
+		output |= VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	if (bu & BufferUsage.uniform)
+		output |= VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 
 	return output;
 }
@@ -249,4 +270,48 @@ VkSharingMode translate(BufferSharing bs) {
 	case BufferSharing.concurrent:
 		return VK_SHARING_MODE_CONCURRENT;
 	}
+}
+
+VkIndexType translate(IndexType it) {
+	final switch (it) {
+	case IndexType.u16:
+		return VkIndexType.VK_INDEX_TYPE_UINT16;
+	case IndexType.u32:
+		return VkIndexType.VK_INDEX_TYPE_UINT32;
+	}
+}
+
+VkDescriptorType translate(DescriptorType dt) {
+	final switch (dt) {
+	case DescriptorType.uniformBuffer:
+		return VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	}
+}
+
+VkShaderStageFlags translate(ShaderStages ss) {
+	VkShaderStageFlags output;
+
+	// Force a compile time error if the enum member is not handled!
+	final switch (ss) {
+	case ShaderStages.vertex:
+	case ShaderStages.geometry:
+	case ShaderStages.fragment:
+	case ShaderStages.compute:
+	case ShaderStages.allGraphics:
+		break;
+	}
+
+	if (ss & ShaderStages.vertex)
+		output |= VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT;
+	if (ss & ShaderStages.geometry)
+		output |= VkShaderStageFlagBits.VK_SHADER_STAGE_GEOMETRY_BIT;
+	if (ss & ShaderStages.fragment)
+		output |= VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT;
+	if (ss & ShaderStages.compute)
+		output |= VkShaderStageFlagBits.VK_SHADER_STAGE_COMPUTE_BIT;
+
+	if ((ss & ShaderStages.allGraphics) == ShaderStages.allGraphics)
+		output |= VkShaderStageFlagBits.VK_SHADER_STAGE_ALL_GRAPHICS;
+
+	return output;
 }

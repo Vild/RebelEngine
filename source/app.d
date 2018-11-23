@@ -1,6 +1,8 @@
 import std.stdio;
 
-import dlsl.vector;
+import gfm.math.vector;
+import gfm.math.matrix;
+import gfm.math.funcs;
 
 import rebel.config;
 import rebel.engine;
@@ -20,13 +22,31 @@ class TestState : IEngineState {
 		writeln(__FUNCTION__);
 		_createRenderpass();
 		_createShaderModules();
+		_createBuffers();
 		_createPipeline();
-		_createVertexBuffer();
 		_createCommandBuffers();
 	}
 
 	void update(float delta) {
 		//writeln(__FUNCTION__);
+
+		{
+			static float counter = 0;
+			counter += delta;
+
+			VkTestUniformBufferObject ubo;
+			ubo.model = mat4f.rotation(counter * radians(90.0f), vec3f(0, 0, 1)).transposed;
+			ubo.view = mat4f.lookAt(vec3f(2.0f, 2.0f, 2.0f), vec3f(0.0f, 0.0f, 0.0f), vec3f(0.0f, 0.0f, 1.0f)).transposed;
+			ubo.proj = mat4f.perspective(radians(45.0f), _view.size.x / cast(float)_view.size.y, 0.1f, 10.0f).transposed;
+
+			if (_renderer.renderType == RendererType.vulkan)
+				ubo.proj.c[1][1] *= -1;
+
+			scope Buffer.Ref data = _renderer.get(_uboBuffers[_renderer.outputIdx]);
+			BufferData* buffer = data.get();
+			buffer.setData((cast(ubyte*)&ubo)[0 .. ubo.sizeof]);
+		}
+
 		_renderer.submit(_commandBuffers[_renderer.outputIdx]);
 	}
 
@@ -35,12 +55,18 @@ class TestState : IEngineState {
 	}
 
 private:
-	alias Position = ShaderData!(vec2, ImageFormat.rg32_float);
-	alias Color = ShaderData!(uvec3b, ImageFormat.rgb8_unorm);
+	alias Position = VertexShaderData!(vec2f, ImageFormat.rg32_float);
+	alias Color = VertexShaderData!(vec3ub, ImageFormat.rgb8_unorm);
 
-	@DataRate(DataRate.vertex) struct VkTestShaderDataVertex {
+	@VertexDataRate(VertexDataRate.vertex) struct VkTestShaderDataVertex {
 		Position position;
 		Color color;
+	}
+
+	struct VkTestUniformBufferObject {
+		mat4f model;
+		mat4f view;
+		mat4f proj;
 	}
 
 	IRenderer _renderer;
@@ -48,20 +74,27 @@ private:
 
 	RenderPass _renderPass;
 	ShaderModule _vertexShaderModule, _fragmentShaderModule;
-	Buffer _vertexBuffer;
+	Buffer _verticesBuffer, _indicesBuffer;
+	Buffer[] _uboBuffers;
 	Pipeline _pipeline;
 
 	CommandBuffer[] _commandBuffers;
 
 	enum Bindings : uint {
-		vertex = 0
+		vertex = 0, // Basically just a misc
+		uniformBufferObject = 0
 	}
 
 	// dfmt off
 	VkTestShaderDataVertex[] _vertices = [
-		VkTestShaderDataVertex(Position(0.0f, -0.5f), Color(cast(ubyte)255, cast(ubyte)255, cast(ubyte)255)),
-		VkTestShaderDataVertex(Position(0.5f, 0.5f), Color(cast(ubyte)0, cast(ubyte)255, cast(ubyte)0)),
-		VkTestShaderDataVertex(Position(-0.5f, 0.5f), Color(cast(ubyte)0, cast(ubyte)0, cast(ubyte)255))
+		VkTestShaderDataVertex(Position(-0.5f, -0.5f), Color(ubyte.max, ubyte.min, ubyte.min)),
+		VkTestShaderDataVertex(Position(0.5f, -0.5f), Color(ubyte.min, ubyte.max, ubyte.min)),
+		VkTestShaderDataVertex(Position(0.5f, 0.5f), Color(ubyte.min, ubyte.min, ubyte.max)),
+		VkTestShaderDataVertex(Position(-0.5f, 0.5f), Color(ubyte.max, ubyte.max, ubyte.max))
+	];
+	ushort[] _indices = [
+		0, 1, 2,
+		2, 3, 0
 	];
 	// dfmt on
 
@@ -144,18 +177,46 @@ private:
 		}
 	}
 
-	void _createVertexBuffer() {
-		BufferBuilder builder;
-		builder.name = "Vertex Buffer";
-		builder.size = _vertices.length * _vertices[0].sizeof;
-		builder.usage = BufferUsage.vertex;
-		builder.sharing = BufferSharing.exclusive;
+	void _createBuffers() {
+		{
+			BufferBuilder builder;
+			builder.name = "Vertices Buffer";
+			builder.size = _vertices.length * _vertices[0].sizeof;
+			builder.usage = BufferUsage.vertex;
+			builder.sharing = BufferSharing.exclusive;
 
-		_vertexBuffer = _renderer.construct(builder);
+			_verticesBuffer = _renderer.construct(builder);
 
-		scope Buffer.Ref data = _renderer.get(_vertexBuffer);
-		BufferData* buffer = data.get();
-		buffer.setData(_vertices);
+			scope Buffer.Ref data = _renderer.get(_verticesBuffer);
+			BufferData* buffer = data.get();
+			buffer.setData(_vertices);
+		}
+		{
+			BufferBuilder builder;
+			builder.name = "Indices Buffer";
+			builder.size = _indices.length * _indices[0].sizeof;
+			builder.usage = BufferUsage.index;
+			builder.sharing = BufferSharing.exclusive;
+
+			_indicesBuffer = _renderer.construct(builder);
+
+			scope Buffer.Ref data = _renderer.get(_indicesBuffer);
+			BufferData* buffer = data.get();
+			buffer.setData(_indices);
+		}
+
+		_uboBuffers.length = _renderer.outputFramebuffers.length;
+		foreach (i, ref uboBuffer; _uboBuffers) {
+			import std.format : format;
+
+			BufferBuilder builder;
+			builder.name = format!"UBO Buffer - Framebuffer #%d"(i);
+			builder.size = VkTestUniformBufferObject.sizeof;
+			builder.usage = BufferUsage.uniform;
+			builder.sharing = BufferSharing.exclusive;
+
+			uboBuffer = _renderer.construct(builder);
+		}
 	}
 
 	void _createPipeline() {
@@ -166,22 +227,37 @@ private:
 		builder.shaderStages ~= _vertexShaderModule;
 		builder.shaderStages ~= _fragmentShaderModule;
 
-		alias vktest = ShaderInputInfo!VkTestShaderDataVertex;
-		builder.vertexInputBindingDescriptions ~= vktest.getBindingDescription(Bindings.vertex);
+		alias vktestVertex = VertexShaderInputInfo!VkTestShaderDataVertex;
+		builder.vertexInputBindingDescriptions ~= vktestVertex.getVertexBindingDescription(Bindings.vertex);
+		builder.vertexInputAttributeDescriptions ~= vktestVertex.getVertexAttributeDescriptions(Bindings.vertex);
 
-		builder.vertexInputAttributeDescriptions ~= vktest.getAttributeDescriptions(Bindings.vertex);
+		alias vktestUBO = ShaderInputInfo!VkTestUniformBufferObject;
+		builder.descriptorSetLayoutBindings ~= vktestUBO.getDescriptorSetLayoutBinding(Bindings.uniformBufferObject, ShaderStages.vertex);
+
+		foreach (i, ref uboBuffer; _uboBuffers) {
+			DescriptorBufferInfo info;
+			info.buffer = uboBuffer;
+			info.offset = 0;
+			info.range = VkTestUniformBufferObject.sizeof;
+
+			info.writeDescriptorSet.binding = Bindings.uniformBufferObject;
+			info.writeDescriptorSet.arrayElement = 0;
+			info.writeDescriptorSet.descriptorCount = 1;
+			info.writeDescriptorSet.descriptorType = DescriptorType.uniformBuffer;
+			builder.descriptorBufferInfos ~= info;
+		}
 
 		builder.vertexTopology = VertexTopology.triangleList;
 
-		builder.viewports = [Viewport(vec2(0, 0), vec2(_view.size), vec2(0, 1))];
-		builder.scissors = [Scissor(ivec2(0, 0), uvec2(_view.size))];
+		builder.viewports = [Viewport(vec2f(0, 0), vec2f(_view.size), vec2f(0, 1))];
+		builder.scissors = [Scissor(vec2i(0, 0), cast(vec2ui)_view.size)];
 
 		builder.rasterizationState.depthClampEnable = false;
 		builder.rasterizationState.rasterizerDiscardEnable = false;
 		builder.rasterizationState.polygonMode = PolygonMode.fill;
 		builder.rasterizationState.lineWidth = 1;
 		builder.rasterizationState.cullMode = CullMode.back;
-		builder.rasterizationState.frontFace = FrontFaceMode.clockwise;
+		builder.rasterizationState.frontFace = FrontFaceMode.counterClockwise;
 		builder.rasterizationState.depthBiasEnable = false;
 
 		builder.multisamplingEnabled = false;
@@ -205,23 +281,25 @@ private:
 			builder.callback = (size_t fbIndex) {
 				return (ICommandBufferRecordingState rs) {
 					Framebuffer fb = _renderer.outputFramebuffers[fbIndex];
-					uvec2 size;
+					vec2ui size;
 					{
 						scope Framebuffer.Ref fbRef = _renderer.get(fb);
 						FramebufferData* data = fbRef.get();
 						size = data.dimension.xy;
 					}
 
+					rs.index = fbIndex;
 					rs.renderPass = _renderPass;
 					rs.framebuffer = fb;
 					rs.pipeline = _pipeline;
-					rs.renderArea = uvec4(0, 0, size.x, size.y);
-					rs.clearColors = [vec4(34 / 255.0f, 0, 34 / 255.0f, 1.0f)];
+					rs.renderArea = vec4ui(0, 0, size.x, size.y);
+					rs.clearColors = [vec4f(34 / 255.0f, 0, 34 / 255.0f, 1.0f)];
 
 					rs.finalizeState();
 
-					rs.bindVertexBuffer(Bindings.vertex, [BufferOffset(_vertexBuffer, 0)]);
-					rs.draw(cast(uint)_vertices.length, 1, 0, 0);
+					rs.bindVertexBuffer(Bindings.vertex, [BufferOffset(_verticesBuffer, 0)]);
+					rs.bindIndexBuffer(BufferOffset(_indicesBuffer, 0), IndexType.u16);
+					rs.drawIndexed(cast(uint)_indices.length, 1, 0, 0, 0);
 				};
 			}(i);
 			_commandBuffers[i] = _renderer.construct(builder);
@@ -267,7 +345,7 @@ int main(string[] args) {
 	}
 
 	const string windowTitle = "My SDL2 Window";
-	const ivec2 windowSize = ivec2(1920, 1080);
+	const vec2i windowSize = vec2i(1920, 1080);
 	const string gameName = "My Test Game";
 	const Version gameVersion = Version(0, 1, 0);
 

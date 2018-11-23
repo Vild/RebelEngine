@@ -2,12 +2,12 @@ module rebel.renderer.types.pipeline;
 
 import rebel.renderer.types;
 
-import dlsl.vector;
+import gfm.math.vector;
 
 struct VertexInputBindingDescription {
 	uint binding;
 	uint stride;
-	DataRate inputRate;
+	VertexDataRate inputRate;
 }
 
 struct VertexInputAttributeDescription {
@@ -21,15 +21,48 @@ enum VertexTopology {
 	triangleList
 }
 
+enum DescriptorType {
+	//sampler,
+	//combinedImageSampler,
+	//sampledImage,
+	//storageImage,
+	//uniformTexelBuffer,
+	//storageTexelBuffer,
+	uniformBuffer, //storageBuffer,
+	//uniformBufferDynamic,
+	//storageBufferDynamic,
+	//inputAttachment,
+	//inlineUniformBlockExt,
+}
+
+enum ShaderStages {
+	vertex = 1 << 0,
+	//tessellationControl = 1 << 1,
+	//tessellationEvaluation = 1 << 2,
+	geometry = 1 << 3,
+	fragment = 1 << 4,
+	compute = 1 << 5,
+	allGraphics = (1 << 6) - 1,
+}
+
+struct DescriptorSetLayoutBinding {
+	uint binding;
+	DescriptorType descriptorType;
+	uint descriptorCount;
+	ShaderStages stages;
+	/*Sampler*/
+	void* immutableSamplers;
+}
+
 struct Viewport {
-	vec2 position = vec2(0, 0);
-	vec2 size = vec2(0, 0);
-	vec2 depthRange = vec2(0, 1);
+	vec2f position = vec2f(0, 0);
+	vec2f size = vec2f(0, 0);
+	vec2f depthRange = vec2f(0, 1);
 }
 
 struct Scissor {
-	ivec2 start;
-	uvec2 end;
+	vec2i start;
+	vec2ui end;
 }
 
 enum PolygonMode {
@@ -94,6 +127,20 @@ struct BlendState {
 	float[4] blendConstants;
 }
 
+struct DescriptorBufferInfo {
+	Buffer buffer;
+	size_t offset;
+	size_t range;
+
+	WriteDescriptorSet writeDescriptorSet;
+}
+struct WriteDescriptorSet {
+	uint binding;
+	uint arrayElement;
+	uint descriptorCount;
+	DescriptorType descriptorType;
+}
+
 struct PipelineBuilder {
 	string name;
 
@@ -106,6 +153,10 @@ struct PipelineBuilder {
 	VertexInputAttributeDescription[] vertexInputAttributeDescriptions; //VkVertexInputAttributeDescription
 
 	VertexTopology vertexTopology;
+
+	// == Descriptor set layout ==
+	DescriptorSetLayoutBinding[] descriptorSetLayoutBindings;
+	DescriptorBufferInfo[] descriptorBufferInfos;
 
 	// == ViewportState ==
 	Viewport[] viewports;

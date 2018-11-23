@@ -4,11 +4,11 @@ import rebel.renderer;
 import rebel.input.event;
 import rebel.input.key;
 
-import dlsl.vector;
+import gfm.math.vector;
 
 struct MouseState {
 	bool isFocused;
-	ivec2 position;
+	vec2i position;
 	MouseButtonState buttons;
 }
 
@@ -21,8 +21,8 @@ interface IView {
 
 	@property bool quit() const;
 
-	@property ivec2 size();
-	@property ivec2 drawableSize();
+	@property vec2i size();
+	@property vec2i drawableSize();
 
 	@property MouseState mouseState();
 	@property void cursorVisibillity(bool visible);
@@ -47,11 +47,11 @@ public:
 		return false;
 	}
 
-	@property ivec2 size() {
-		return ivec2(0, 0);
+	@property vec2i size() {
+		return vec2i(0, 0);
 	}
 
-	@property ivec2 drawableSize() {
+	@property vec2i drawableSize() {
 		return size;
 	}
 

@@ -26,13 +26,15 @@ struct VKBufferData {
 	}
 
 	void create() {
+		bool isUniform = builder.usage == BufferUsage.uniform;
+
 		VkBufferCreateInfo createInfo;
 		createInfo.size = builder.size;
-		createInfo.usage = builder.usage.translate | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		createInfo.usage = builder.usage.translate | (isUniform ? 0 : VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 		createInfo.sharingMode = builder.sharing.translate;
 
 		VmaAllocationCreateInfo allocInfo;
-		allocInfo.usage = VmaMemoryUsage.VMA_MEMORY_USAGE_GPU_ONLY;
+		allocInfo.usage = isUniform ? VmaMemoryUsage.VMA_MEMORY_USAGE_CPU_TO_GPU : VmaMemoryUsage.VMA_MEMORY_USAGE_GPU_ONLY;
 		allocInfo.flags = VmaAllocationCreateFlagBits.VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
 		vkAssert(vmaCreateBuffer(device.allocator, &createInfo, &allocInfo, &buffer, &allocation, &allocationInfo),

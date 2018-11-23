@@ -5,7 +5,7 @@ import rebel.renderer;
 import rebel.config;
 import rebel.handle;
 
-import dlsl.vector;
+import gfm.math.vector;
 
 import opengl.gl4;
 import opengl.loader;
@@ -18,7 +18,7 @@ interface IOpenGLView : IView {
 }
 
 interface IOpenGLRenderer : IRenderer {
-	@property ivec2 glVersion() const;
+	@property vec2i glVersion() const;
 }
 
 final class GLRenderer : IOpenGLRenderer {
@@ -99,8 +99,8 @@ public:
 		return RendererType.opengl;
 	}
 
-	@property ivec2 glVersion() const {
-		return ivec2(4, 5);
+	@property vec2i glVersion() const {
+		return vec2i(4, 5);
 	}
 
 private:

@@ -24,7 +24,7 @@ dependency "derelict-physfs" version="~>3.0.0-beta.2"
 
 # Type handlers
 dependency "imageformats" version="~>7.0.0"
-dependency "dlsl" version="~>0.1.2"
+dependency "gfm:math" version="~>7.0.5"
 dependency "sdlss" version="~>0.3.3"
 
 # Misc

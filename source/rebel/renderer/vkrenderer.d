@@ -74,14 +74,14 @@ extern (C) static VkBool32 vulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBi
 		if (cmdBufLabels) {
 			stderr.writefln("CommandBuffer Labels - Amount: %d:", cmdBufLabels.length);
 			foreach (idx, ref label; cmdBufLabels)
-				stderr.writefln("\tLable[%d]: - %s {%(%f%|, %)}", idx, label.pLabelName.fromStringz, label.color);
+				stderr.writefln("\tLabel[%d]: - %s {%(%f%|, %)}", idx, label.pLabelName.fromStringz, label.color);
 		}
 
 		const(VkDebugUtilsLabelEXT)[] queueLabels = pCallbackData.pQueueLabels[0 .. pCallbackData.queueLabelCount];
 		if (queueLabels) {
 			stderr.writefln("Queue Labels - Amount: %d:", queueLabels.length);
 			foreach (idx, ref label; queueLabels)
-				stderr.writefln("\tLable[%d]: - %s {%(%f%|, %)}", idx, label.pLabelName.fromStringz, label.color);
+				stderr.writefln("\tLabel[%d]: - %s {%(%f%|, %)}", idx, label.pLabelName.fromStringz, label.color);
 		}
 
 		stderr.writefln("Message:\n\t%s", pCallbackData.pMessage.fromStringz);
@@ -92,7 +92,10 @@ extern (C) static VkBool32 vulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBi
 	} catch (Exception) {
 	}
 
-	return VK_FALSE;
+	assert(!(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT));
+	assert(0);
+
+	//return VK_FALSE;
 }
 
 final class VKRenderer : IVulkanRenderer {

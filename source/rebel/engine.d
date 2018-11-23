@@ -19,7 +19,7 @@ interface IEngineState {
 	void exit(IEngineState newState);
 }
 
-import dlsl.vector;
+import gfm.math.vector;
 
 final class TestView : IUIView, ITexture2D {
 
@@ -77,11 +77,11 @@ public:
 		return this;
 	}
 
-	@property ivec2 drawAreaSize() {
+	@property vec2i drawAreaSize() {
 		return _drawAreaSize;
 	}
 
-	@property void drawAreaSize(ivec2 size) {
+	@property void drawAreaSize(vec2i size) {
 		if (size.x < 1)
 			size.x = 1;
 		if (size.y < 1)
@@ -95,7 +95,7 @@ public:
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
-	@property ivec2 getSize() {
+	@property vec2i getSize() {
 		return _drawAreaSize;
 	}
 
@@ -105,7 +105,7 @@ public:
 
 private:
 	GLuint _fb;
-	ivec2 _drawAreaSize = ivec2(640, 480);
+	vec2i _drawAreaSize = vec2i(640, 480);
 
 	GLuint _color;
 	GLuint _depth;

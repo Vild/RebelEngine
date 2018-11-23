@@ -3,7 +3,9 @@ module rebel.renderer.types.buffer;
 import rebel.renderer.types;
 
 enum BufferUsage {
-	vertex = 1 << 0
+	vertex = 1 << 0,
+	index = 1 << 1,
+	uniform = 1 << 2
 }
 
 enum BufferSharing {
@@ -16,6 +18,7 @@ struct BufferBuilder {
 	size_t size;
 	BufferUsage usage;
 	BufferSharing sharing;
+	//TODO: Add bool isGpuOnly?
 }
 
 struct BufferData {
