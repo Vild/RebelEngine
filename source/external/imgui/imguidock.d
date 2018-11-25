@@ -1,6 +1,6 @@
 module external.imgui.imguidock;
 
-import derelict.imgui.imgui;
+import cimgui;
 
 extern (C) @nogc nothrow {
 	enum ImGuiDockSlot {

@@ -1,8 +1,8 @@
-name "imgui_extensions"
+name "cimgui"
 targetType "library"
 targetPath "../../bin"
 
 importPaths "source"
 sourcePaths "source"
 
-dependency "rebelengine:cimgui" path="../../"
+lflags "./3rdparty/cimgui/cimgui.so"

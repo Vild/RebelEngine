@@ -6,16 +6,17 @@ license "MPLv2"
 
 targetPath "bin/"
 
-lflags "-rpath=3rdparty/DerelictImgui/cimgui/cimgui" platform="posix"
+lflags "-rpath=3rdparty/cimgui" platform="posix"
 
-subPackage "lib/imgui_extensions"
+subPackage "lib/cimgui"
+//subPackage "lib/imgui_extensions"
 subPackage "lib/vulkan_memory_allocator"
-dependency ":imgui_extensions" version="*"
-dependency ":vulkan_memory_allocator" version="*"
 
 # Rendering
 dependency "derelict-sdl2" version="~>3.1.0-alpha.4"
-dependency "derelict-imgui" path="3rdparty/DerelictImgui"
+dependency ":cimgui" version="*"
+//dependency ":imgui_extensions" version="*"
+dependency ":vulkan_memory_allocator" version="*"
 dependency "erupted" version="~>2.0.9+v1.1.83"
 dependency "opengl:gl4" version="~>1.0.0"
 

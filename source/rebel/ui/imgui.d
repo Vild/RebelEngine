@@ -9,17 +9,18 @@ import rebel.renderer;
 import rebel.input.event;
 import rebel.input.key;
 
-import derelict.imgui.imgui;
+//import derelict.imgui.imgui;
+import cimgui;
 import derelict.sdl2.sdl;
 
 import gfm.math.vector;
 
 import opengl.gl4;
 
-public import imgui_extensions;
+//public import imgui_extensions;
 
 shared static this() {
-	DerelictImgui.load();
+	//DerelictImgui.load();
 	/*
 	DerelictImgui.bindFunc(cast(void**)&igCreateDockContext, "igCreateDockContext");
 	DerelictImgui.bindFunc(cast(void**)&igDestroyDockContext, "igDestroyDockContext");
@@ -39,6 +40,7 @@ final class ImguiUI : IUIRenderer {
 public:
 	this(IView view) {
 		_view = view;
+		_context = igCreateContext(null);
 
 		ImGuiIO* io = igGetIO();
 		// Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
@@ -62,7 +64,6 @@ public:
 		io.KeyMap[ImGuiKey_Y] = cast(uint)Key.y;
 		io.KeyMap[ImGuiKey_Z] = cast(uint)Key.z;
 
-		io.RenderDrawListsFn = &_renderDrawLists;
 		io.SetClipboardTextFn = &_setClipboardText;
 		io.GetClipboardTextFn = &_getClipboardText;
 		io.ClipboardUserData = null;
@@ -110,7 +111,7 @@ public:
 
 			f.read(data);
 
-			initSymbolFont("FontAwesome", fontSize, data);
+			//initSymbolFont("FontAwesome", fontSize, data);
 		}
 		igStyleColorsDark(igGetStyle());
 
@@ -120,7 +121,7 @@ public:
 	~this() {
 		resetRenderer();
 
-		igShutdown();
+		igDestroyContext(_context);
 	}
 
 	void newFrame(float delta) {
@@ -163,33 +164,33 @@ public:
 
 		ImVec2 menuBarSize;
 		if (igBeginMainMenuBar()) {
-			if (igBeginMenu("File")) {
-				igMenuItem("New");
-				igMenuItem("Open");
-				igMenuItem("Save");
-				igMenuItem("Save As");
+			if (igBeginMenu("File", true)) {
+				igMenuItemBool("New", null, false, true);
+				igMenuItemBool("Open", null, false, true);
+				igMenuItemBool("Save", null, false, true);
+				igMenuItemBool("Save As", null, false, true);
 				igSeparator();
-				igMenuItem("Quit");
+				igMenuItemBool("Quit", null, false, true);
 				igEndMenu();
 			}
-			if (igBeginMenu("Editor")) {
+			if (igBeginMenu("Editor", true)) {
 				igEndMenu();
 			}
-			if (igBeginMenu("Help")) {
+			if (igBeginMenu("Help", true)) {
 				igEndMenu();
 			}
 
 			igCheckbox("Show Demo Window", &_showDemoWindow);
 			//_showDemoWindow = !_showDemoWindow;
 
-			igGetWindowSize(&menuBarSize);
+			menuBarSize = igGetWindowSize();
 			igEndMainMenuBar();
 		}
 
-		igSetNextWindowPos(ImVec2(0, menuBarSize.y));
+		igSetNextWindowPos(ImVec2(0, menuBarSize.y), 0, ImVec2(0, 0));
 		auto fullscreenSize = igGetIO().DisplaySize;
 		fullscreenSize.y -= menuBarSize.y;
-		igSetNextWindowSize(fullscreenSize);
+		igSetNextWindowSize(fullscreenSize, 0);
 		const ImGuiWindowFlags flags = (ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus
 				| ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
 		const bool visible = igBegin("Workspace", null, flags);
@@ -213,7 +214,7 @@ public:
 			static string[] actions = [
 				"Select", "Move", "Rotate", "Scale", "New entity", "New Light", "New Block", "Cut block", "Change Material"
 			];
-			igDrawSplitter(false, style.WindowPadding.x, &leftPanelSizeWidth, &viewportSizeWidth, 150, 150);
+			/*igDrawSplitter(false, style.WindowPadding.x, &leftPanelSizeWidth, &viewportSizeWidth, 150, 150);
 			{ // Left
 				igBeginChild("Left pane", ImVec2(leftPanelSizeWidth, 0), true);
 				foreach (i, action; actions) {
@@ -290,7 +291,7 @@ public:
 					igEndChild();
 				}
 				igEndChild();
-			}
+			}*/
 		}
 		igEnd();
 		if (_showDemoWindow)
@@ -299,6 +300,9 @@ public:
 
 	void endRender() {
 		igRender();
+
+		ImDrawData* draw_data = igGetDrawData();
+		_renderDrawLists(draw_data);
 	}
 
 	// You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -333,7 +337,7 @@ public:
 				io.KeyCtrl = key.modifiers.ctrl;
 				io.KeyAlt = key.modifiers.alt;
 				io.KeySuper = key.modifiers.super_;
-			}, (ref TextInputEvent text) { ImGuiIO_AddInputCharactersUTF8(text.text[].dup.ptr); });
+			}, (ref TextInputEvent text) { ImGuiIO_AddInputCharactersUTF8(igGetIO(), text.text[].dup.ptr); });
 	}
 
 	void resetRenderer() {
@@ -375,6 +379,7 @@ public:
 	}
 
 private:
+	static ImGuiContext* _context;
 	static IView _view;
 	IUIView _worldView;
 	static bool _showDemoWindow = true; // Data
@@ -515,7 +520,7 @@ private:
 		int fb_height = cast(uint)(io.DisplaySize.y * io.DisplayFramebufferScale.y);
 		if (fb_width == 0 || fb_height == 0)
 			return;
-		draw_data.ScaleClipRects(io.DisplayFramebufferScale); // Backup GL state
+		ImDrawData_ScaleClipRects(draw_data, io.DisplayFramebufferScale); // Backup GL state
 		GLenum last_active_texture;
 		glGetIntegerv(GL_ACTIVE_TEXTURE, cast(GLint*)&last_active_texture);
 		glActiveTexture(GL_TEXTURE0);
@@ -575,14 +580,14 @@ private:
 			ImDrawIdx* idx_buffer_offset = null;
 
 			glBindBuffer(GL_ARRAY_BUFFER, g_VboHandle);
-			glBufferData(GL_ARRAY_BUFFER, cast(GLsizeiptr)ImDrawList_GetVertexBufferSize(cmd_list) * ImDrawVert.sizeof,
-					cast(const GLvoid*)ImDrawList_GetVertexPtr(cmd_list, 0), GL_STREAM_DRAW);
+			glBufferData(GL_ARRAY_BUFFER, cast(GLsizeiptr)cmd_list.VtxBuffer.Size * ImDrawVert.sizeof,
+					cast(const GLvoid*)cmd_list.VtxBuffer.Data, GL_STREAM_DRAW);
 
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_ElementsHandle);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, cast(GLsizeiptr)ImDrawList_GetIndexBufferSize(cmd_list) * ImDrawIdx.sizeof,
-					cast(const GLvoid*)ImDrawList_GetIndexPtr(cmd_list, 0), GL_STREAM_DRAW);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, cast(GLsizeiptr)cmd_list.IdxBuffer.Size * ImDrawIdx.sizeof,
+					cast(const GLvoid*)cmd_list.IdxBuffer.Data, GL_STREAM_DRAW);
 
-			foreach (ref ImDrawCmd pcmd; ImDrawList_GetCmdPtr(cmd_list, 0)[0 .. ImDrawList_GetCmdSize(cmd_list)]) {
+			foreach (ref ImDrawCmd pcmd; cmd_list.CmdBuffer.Data[0 .. cmd_list.CmdBuffer.Size]) {
 				if (pcmd.UserCallback)
 					pcmd.UserCallback(cmd_list, &pcmd);
 				else {
@@ -648,7 +653,7 @@ private:
 		ImGuiIO* io = igGetIO();
 		ubyte* pixels;
 		int width, height;
-		ImFontAtlas_GetTexDataAsRGBA32(io.Fonts, &pixels, &width, &height); // Load as RGBA 32-bits for OpenGL3 demo because it is more likely to be compatible with user's existing shader.
+		ImFontAtlas_GetTexDataAsRGBA32(io.Fonts, &pixels, &width, &height, null); // Load as RGBA 32-bits for OpenGL3 demo because it is more likely to be compatible with user's existing shader.
 
 		// Upload texture to graphics system
 		GLint last_texture;
