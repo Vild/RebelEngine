@@ -234,18 +234,8 @@ private:
 		alias vktestUBO = ShaderInputInfo!VkTestUniformBufferObject;
 		builder.descriptorSetLayoutBindings ~= vktestUBO.getDescriptorSetLayoutBinding(Bindings.uniformBufferObject, ShaderStages.vertex);
 
-		foreach (i, ref uboBuffer; _uboBuffers) {
-			DescriptorBufferInfo info;
-			info.buffer = uboBuffer;
-			info.offset = 0;
-			info.range = VkTestUniformBufferObject.sizeof;
-
-			info.writeDescriptorSet.binding = Bindings.uniformBufferObject;
-			info.writeDescriptorSet.arrayElement = 0;
-			info.writeDescriptorSet.descriptorCount = 1;
-			info.writeDescriptorSet.descriptorType = DescriptorType.uniformBuffer;
-			builder.descriptorBufferInfos ~= info;
-		}
+		foreach (i, uboBuffer; _uboBuffers)
+			builder.descriptorBufferInfos ~= vktestUBO.getDescriptorBufferInfo(uboBuffer, Bindings.uniformBufferObject);
 
 		builder.vertexTopology = VertexTopology.triangleList;
 

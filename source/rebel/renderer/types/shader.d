@@ -45,9 +45,11 @@ static struct VertexShaderInputInfo(T) {
 	static VertexInputAttributeDescription[] getVertexAttributeDescriptions(uint binding) {
 		import std.traits;
 		import std.meta;
+
 		template isVariable(string member) {
 			enum isVariable = __traits(compiles, mixin("T." ~ member ~ ".T"));
 		}
+
 		alias members = Filter!(isVariable, __traits(allMembers, T));
 		static VertexInputAttributeDescription[[members].length] attributeDescriptions;
 		static bool created;
@@ -101,5 +103,18 @@ static struct ShaderInputInfo(T) {
 		layoutBinding.stages = stages;
 		layoutBinding.immutableSamplers = null;
 		return layoutBinding;
+	}
+
+	static DescriptorBufferInfo getDescriptorBufferInfo(Buffer buffer, uint binding) {
+		DescriptorBufferInfo info;
+		info.buffer = buffer;
+		info.offset = 0;
+		info.range = T.sizeof;
+
+		info.writeDescriptorSet.binding = binding;
+		info.writeDescriptorSet.arrayElement = 0;
+		info.writeDescriptorSet.descriptorCount = 1;
+		info.writeDescriptorSet.descriptorType = DescriptorType.uniformBuffer;
+		return info;
 	}
 }
