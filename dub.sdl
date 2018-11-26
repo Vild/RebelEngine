@@ -8,6 +8,8 @@ targetPath "bin/"
 
 lflags "-rpath=3rdparty/cimgui" platform="posix"
 
+preGenerateCommands "make -f assets.mk"
+
 subPackage "lib/cimgui"
 //subPackage "lib/imgui_extensions"
 subPackage "lib/vulkan_memory_allocator"

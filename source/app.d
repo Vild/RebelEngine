@@ -155,7 +155,7 @@ private:
 
 		{
 			ShaderModuleBuilder vertexBuilder;
-			FSFile file = fs.open("vktest/vert.spv", FileMode.read);
+			FSFile file = fs.open("vktest/base.vert.spv", FileMode.read);
 			assert(file);
 			char[] data;
 			scope (exit)
@@ -163,7 +163,7 @@ private:
 			data.length = file.length;
 			file.read(data);
 
-			vertexBuilder.name = "vktest/vert.spv";
+			vertexBuilder.name = "vktest/base.vert.spv";
 			vertexBuilder.sourcecode = cast(string)data;
 			vertexBuilder.entrypoint = "main";
 			vertexBuilder.type = ShaderType.vertex;
@@ -172,7 +172,7 @@ private:
 
 		{
 			ShaderModuleBuilder fragmentBuilder;
-			FSFile file = fs.open("vktest/frag.spv", FileMode.read);
+			FSFile file = fs.open("vktest/base.frag.spv", FileMode.read);
 			assert(file);
 			char[] data;
 			scope (exit)
@@ -180,7 +180,7 @@ private:
 			data.length = file.length;
 			file.read(data);
 
-			fragmentBuilder.name = "vktest/frag.spv";
+			fragmentBuilder.name = "vktest/base.frag.spv";
 			fragmentBuilder.sourcecode = cast(string)data;
 			fragmentBuilder.entrypoint = "main";
 			fragmentBuilder.type = ShaderType.fragment;

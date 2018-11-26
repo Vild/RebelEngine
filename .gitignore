@@ -20,3 +20,6 @@ imgui.ini
 CppCode*
 *.spv
 memoryStats.json
+
+assets/**/*.jpg
+assets/**/*.png
