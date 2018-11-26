@@ -192,6 +192,8 @@ private:
 		const(char)*[] extensions = [VK_KHR_SWAPCHAIN_EXTENSION_NAME];
 
 		VkPhysicalDeviceFeatures deviceFeatures;
+		deviceFeatures.samplerAnisotropy = true;
+		deviceFeatures.geometryShader = true;
 		VkDeviceCreateInfo deviceCreateInfo;
 		deviceCreateInfo.queueCreateInfoCount = cast(uint)queueCreateInfos.length;
 		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfos[0];
@@ -420,7 +422,10 @@ private:
 	}
 
 	void _createDescriptorPools() {
-		VkDescriptorPoolSize[] poolSizes = [VkDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, cast(uint)swapChainImages.length)];
+		VkDescriptorPoolSize[] poolSizes = [
+			VkDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, cast(uint)swapChainImages.length),
+			VkDescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, cast(uint)swapChainImages.length)
+		];
 
 		VkDescriptorPoolCreateInfo poolInfo;
 		poolInfo.poolSizeCount = cast(uint)poolSizes.length;

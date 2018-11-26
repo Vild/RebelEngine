@@ -124,6 +124,7 @@ public:
 		_framebuffers.clear;
 		_renderPasses.clear;
 		_shaderModules.clear;
+		_samplers.clear;
 		_images.clear;
 		_imageTemplates.clear;
 
@@ -231,6 +232,7 @@ public:
 	ImageTemplate construct(ref ImageTemplateBuilder builder) { return _imageTemplates.create(builder, &_device); }
 	Pipeline construct(ref PipelineBuilder builder) { return _pipelines.create(builder, &_device); }
 	RenderPass construct(ref RenderPassBuilder builder) { return _renderPasses.create(builder, &_device); }
+	Sampler construct(ref SamplerBuilder builder) { return _samplers.create(builder, &_device); }
 	ShaderModule construct(ref ShaderModuleBuilder builder) { return _shaderModules.create(builder, &_device); }
 
 	// Custom
@@ -243,6 +245,7 @@ public:
 	ImageTemplate.Ref get(ImageTemplate handle) { return _imageTemplates.get(handle); }
 	Pipeline.Ref get(Pipeline handle) { return _pipelines.get(handle); }
 	RenderPass.Ref get(RenderPass handle) { return _renderPasses.get(handle); }
+	Sampler.Ref get(Sampler handle) { return _samplers.get(handle); }
 	ShaderModule.Ref get(ShaderModule handle) { return _shaderModules.get(handle); }
 
 	void destruct(Buffer handle) { assert(!handle.isValid); return _buffers.remove(handle); }
@@ -252,6 +255,7 @@ public:
 	void destruct(ImageTemplate handle) { assert(!handle.isValid); return _imageTemplates.remove(handle); }
 	void destruct(Pipeline handle) { assert(!handle.isValid); return _pipelines.remove(handle); }
 	void destruct(RenderPass handle) { assert(!handle.isValid); return _renderPasses.remove(handle); }
+	void destruct(Sampler handle) { assert(!handle.isValid); return _samplers.remove(handle); }
 	void destruct(ShaderModule handle) { assert(!handle.isValid); return _shaderModules.remove(handle); }
 	// dfmt on
 
@@ -301,6 +305,7 @@ private:
 	HandleStorage!(ImageTemplate, VKImageTemplateData) _imageTemplates;
 	HandleStorage!(Pipeline, VKPipelineData) _pipelines;
 	HandleStorage!(RenderPass, VKRenderPassData) _renderPasses;
+	HandleStorage!(Sampler, VKSamplerData) _samplers;
 	HandleStorage!(ShaderModule, VKShaderModuleData) _shaderModules;
 
 	void _recreate() {
@@ -324,6 +329,7 @@ private:
 		cleanup(_buffers);
 		cleanup(_framebuffers);
 		cleanup(_renderPasses);
+		cleanup(_samplers);
 		cleanup(_images);
 		cleanup(_imageTemplates);
 
@@ -331,6 +337,7 @@ private:
 
 		create(_imageTemplates);
 		create(_images);
+		create(_samplers);
 		create(_renderPasses);
 		create(_framebuffers);
 		create(_buffers);
@@ -400,7 +407,7 @@ private:
 				VkPhysicalDeviceFeatures deviceFeatures;
 				vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-				if (!deviceFeatures.geometryShader)
+				if (!deviceFeatures.geometryShader || !deviceFeatures.samplerAnisotropy)
 					return false;
 				VkQueueFamilyProperties[] queueFamilies = getVKList(vkGetPhysicalDeviceQueueFamilyProperties, device);
 				foreach (uint i, VkQueueFamilyProperties q; queueFamilies) {

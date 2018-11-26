@@ -35,6 +35,10 @@ struct VKImageTemplateData {
 		samples = cast(VkSampleCountFlagBits)builder.samples;
 
 		final switch (builder.usage) {
+		case ImageUsage.transferDst:
+			aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+			base.layout = ImageLayout.transferDst;
+			break;
 		case ImageUsage.presentAttachment:
 			aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
 			base.layout = ImageLayout.present;

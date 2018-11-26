@@ -6,14 +6,13 @@ import rebel.input.event;
 import rebel.input.key;
 
 import derelict.sdl2.sdl;
-
-//public import derelict.sdl2.image;
+import derelict.sdl2.image;
 
 import gfm.math.vector;
 
 shared static this() {
 	DerelictSDL2.load();
-	//DerelictSDL2Image.load();
+	DerelictSDL2Image.load();
 }
 
 void sdlAssert(T, Args...)(T cond, Args args) {
@@ -39,7 +38,7 @@ public:
 
 		_renderer = renderer;
 		sdlAssert(!SDL_Init(SDL_INIT_EVERYTHING), "SDL could not initialize!");
-		//sdlAssert(IMG_Init(IMG_INIT_PNG), "SDL_image could not initialize!");
+		sdlAssert(IMG_Init(IMG_INIT_PNG), "SDL_image could not initialize!");
 
 		SDL_WindowFlags windowFlags = SDL_WindowFlags.SDL_WINDOW_SHOWN;
 
@@ -80,7 +79,7 @@ public:
 		else if (_rendererType == RendererType.opengl)
 			SDL_GL_DeleteContext(_glContext);
 
-		//IMG_Quit();
+		IMG_Quit();
 		SDL_Quit();
 	}
 

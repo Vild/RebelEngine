@@ -23,7 +23,7 @@ enum VertexTopology {
 
 enum DescriptorType {
 	//sampler,
-	//combinedImageSampler,
+	combinedImageSampler,
 	//sampledImage,
 	//storageImage,
 	//uniformTexelBuffer,
@@ -127,6 +127,13 @@ struct BlendState {
 	float[4] blendConstants;
 }
 
+struct WriteDescriptorSet {
+	uint binding;
+	uint arrayElement;
+	uint descriptorCount;
+	DescriptorType descriptorType;
+}
+
 struct DescriptorBufferInfo {
 	Buffer buffer;
 	size_t offset;
@@ -134,11 +141,12 @@ struct DescriptorBufferInfo {
 
 	WriteDescriptorSet writeDescriptorSet;
 }
-struct WriteDescriptorSet {
-	uint binding;
-	uint arrayElement;
-	uint descriptorCount;
-	DescriptorType descriptorType;
+
+struct DescriptorImageInfo {
+	Image image;
+	Sampler sampler;
+
+	WriteDescriptorSet writeDescriptorSet;
 }
 
 struct PipelineBuilder {
@@ -157,6 +165,7 @@ struct PipelineBuilder {
 	// == Descriptor set layout ==
 	DescriptorSetLayoutBinding[] descriptorSetLayoutBindings;
 	DescriptorBufferInfo[] descriptorBufferInfos;
+	DescriptorImageInfo[] descriptorImageInfos;
 
 	// == ViewportState ==
 	Viewport[] viewports;

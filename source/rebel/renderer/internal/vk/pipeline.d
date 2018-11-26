@@ -187,18 +187,24 @@ struct VKPipelineData {
 		vkAssert(device.dispatch.AllocateDescriptorSets(&allocInfo, descriptorSets.ptr));
 
 		assert(builder.descriptorBufferInfos.length == device.swapChainImages.length);
+		// TODO: calculate these sizes
 		VkDescriptorBufferInfo[] bufferInfos;
 		bufferInfos.length = builder.descriptorBufferInfos.length;
-		VkWriteDescriptorSet[] descriptorWrites;
-		descriptorWrites.length = builder.descriptorBufferInfos.length;
 
+		VkDescriptorImageInfo[] imageInfos;
+		imageInfos.length = builder.descriptorImageInfos.length;
+
+		VkWriteDescriptorSet[] descriptorWrites;
+		descriptorWrites.length = bufferInfos.length + imageInfos.length * device.swapChainImages.length;
+
+		size_t counter;
 		foreach (size_t i, DescriptorBufferInfo info; builder.descriptorBufferInfos) {
 			VkDescriptorBufferInfo* bufferInfo = &bufferInfos[i];
 			bufferInfo.buffer = renderer.get(info.buffer).get!VKBufferData().buffer;
 			bufferInfo.offset = info.offset;
 			bufferInfo.range = info.range;
 
-			VkWriteDescriptorSet* descriptorWrite = &descriptorWrites[i];
+			VkWriteDescriptorSet* descriptorWrite = &descriptorWrites[counter++];
 			descriptorWrite.dstSet = descriptorSets[i];
 			descriptorWrite.dstBinding = info.writeDescriptorSet.binding;
 			descriptorWrite.dstArrayElement = info.writeDescriptorSet.arrayElement;
@@ -206,6 +212,29 @@ struct VKPipelineData {
 			descriptorWrite.descriptorType = info.writeDescriptorSet.descriptorType.translate;
 			descriptorWrite.pBufferInfo = bufferInfo;
 		}
+
+		foreach (size_t descriptorSetIndex; 0 .. device.swapChainImages.length)
+			foreach (size_t i, DescriptorImageInfo info; builder.descriptorImageInfos) {
+				VkDescriptorImageInfo* imageInfo = &imageInfos[i];
+				if (descriptorSetIndex == 0) {
+					Image.Ref imageRef = renderer.get(info.image);
+					VKImageData* iData = imageRef.get!VKImageData;
+					imageInfo.imageView = iData.view;
+					imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+					Sampler.Ref samplerRef = renderer.get(info.sampler);
+					VKSamplerData* sData = samplerRef.get!VKSamplerData;
+					imageInfo.sampler = sData.sampler;
+				}
+
+				VkWriteDescriptorSet* descriptorWrite = &descriptorWrites[counter++];
+				descriptorWrite.dstSet = descriptorSets[descriptorSetIndex];
+				descriptorWrite.dstBinding = info.writeDescriptorSet.binding;
+				descriptorWrite.dstArrayElement = info.writeDescriptorSet.arrayElement;
+				descriptorWrite.descriptorCount = info.writeDescriptorSet.descriptorCount;
+				descriptorWrite.descriptorType = info.writeDescriptorSet.descriptorType.translate;
+				descriptorWrite.pImageInfo = imageInfo;
+			}
 		device.dispatch.UpdateDescriptorSets(cast(uint)descriptorWrites.length, descriptorWrites.ptr, 0, null);
 	}
 

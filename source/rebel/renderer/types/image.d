@@ -11,6 +11,9 @@ struct ImageBuilder {
 struct ImageData {
 	/*ImageFormat format;
 	ImageLayout layout;*/
+
+	void[]delegate(void[] outputBuffer) getData;
+	void delegate(void[] data) setData;
 }
 
 alias Image = Handle!(ImageData, 1024);

@@ -10,6 +10,7 @@ public {
 	import rebel.renderer.internal.vk.imagetemplate;
 	import rebel.renderer.internal.vk.pipeline;
 	import rebel.renderer.internal.vk.renderpass;
+	import rebel.renderer.internal.vk.sampler;
 	import rebel.renderer.internal.vk.shadermodule;
 	import rebel.renderer.internal.vk.translate;
 }

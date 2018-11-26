@@ -65,7 +65,7 @@ struct VKBufferData {
 	StagingBuffer createStaging() {
 		StagingBuffer ret;
 		VkBufferCreateInfo createInfo;
-		createInfo.size = builder.size;
+		createInfo.size = allocationInfo.size;
 		createInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -76,8 +76,8 @@ struct VKBufferData {
 		vkAssert(vmaCreateBuffer(device.allocator, &createInfo, &allocInfo, &ret.buffer, &ret.allocation,
 				&ret.allocationInfo), "Failed to create buffer!");
 
-		setVkObjectName(device, VK_OBJECT_TYPE_BUFFER, buffer, "Staging buffer");
-		setVkObjectName(device, VK_OBJECT_TYPE_DEVICE_MEMORY, allocationInfo.deviceMemory, "Staging buffer");
+		setVkObjectName(device, VK_OBJECT_TYPE_BUFFER, ret.buffer, "Staging buffer");
+		setVkObjectName(device, VK_OBJECT_TYPE_DEVICE_MEMORY, ret.allocationInfo.deviceMemory, "Staging buffer");
 		return ret;
 	}
 
@@ -113,7 +113,7 @@ struct VKBufferData {
 			VkBufferCopy region;
 			region.srcOffset = 0;
 			region.dstOffset = 0;
-			region.size = builder.size;
+			region.size = allocationInfo.size;
 			device.dispatch.vkCmdCopyBuffer(cb, staging.buffer, buffer, 1, &region);
 			device.endSingleTimeCommands();
 

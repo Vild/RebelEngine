@@ -70,6 +70,8 @@ VkImageLayout translate(ImageLayout layout) {
 	final switch (layout) {
 	case ImageLayout.undefined:
 		return VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+	case ImageLayout.transferDst:
+		return VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	case ImageLayout.color:
 		return VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	case ImageLayout.colorReadOnly:
@@ -231,6 +233,8 @@ VkLogicOp translate(LogicOp lo) {
 
 VkImageUsageFlags translate(ImageUsage iu) {
 	final switch (iu) {
+	case ImageUsage.transferDst:
+		return VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	case ImageUsage.presentAttachment:
 		return VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	case ImageUsage.colorAttachment:
@@ -283,6 +287,8 @@ VkIndexType translate(IndexType it) {
 
 VkDescriptorType translate(DescriptorType dt) {
 	final switch (dt) {
+	case DescriptorType.combinedImageSampler:
+		return VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	case DescriptorType.uniformBuffer:
 		return VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	}

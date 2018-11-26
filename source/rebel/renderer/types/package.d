@@ -11,6 +11,7 @@ public {
 	import rebel.renderer.types.imagetemplate;
 	import rebel.renderer.types.pipeline;
 	import rebel.renderer.types.renderpass;
+	import rebel.renderer.types.sampler;
 	import rebel.renderer.types.shader;
 	import rebel.renderer.types.shadermodule;
 }

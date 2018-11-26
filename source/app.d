@@ -23,6 +23,7 @@ class TestState : IEngineState {
 		_createRenderpass();
 		_createShaderModules();
 		_createBuffers();
+		_createTextures();
 		_createPipeline();
 		_createCommandBuffers();
 	}
@@ -31,12 +32,16 @@ class TestState : IEngineState {
 		//writeln(__FUNCTION__);
 
 		{
+			import std.math : sin, abs;
+			import std.algorithm : max;
+
 			static float counter = 0;
 			counter += delta;
 
 			VkTestUniformBufferObject ubo;
 			ubo.model = mat4f.rotation(counter * radians(90.0f), vec3f(0, 0, 1)).transposed;
-			ubo.view = mat4f.lookAt(vec3f(2.0f, 2.0f, 2.0f), vec3f(0.0f, 0.0f, 0.0f), vec3f(0.0f, 0.0f, 1.0f)).transposed;
+			ubo.view = mat4f.lookAt(vec3f(2.0f, 2.0f, 2.0f) * (0.1 + 0.5 * abs(sin(counter))), vec3f(0.0f, 0.0f, 0.0f), vec3f(0.0f, 0.0f, 1.0f))
+				.transposed;
 			ubo.proj = mat4f.perspective(radians(45.0f), _view.size.x / cast(float)_view.size.y, 0.1f, 10.0f).transposed;
 
 			if (_renderer.renderType == RendererType.vulkan)
@@ -57,10 +62,12 @@ class TestState : IEngineState {
 private:
 	alias Position = VertexShaderData!(vec2f, ImageFormat.rg32_float);
 	alias Color = VertexShaderData!(vec3ub, ImageFormat.rgb8_unorm);
+	alias TexCoord = VertexShaderData!(vec2f, ImageFormat.rg32_float);
 
 	@VertexDataRate(VertexDataRate.vertex) struct VkTestShaderDataVertex {
 		Position position;
 		Color color;
+		TexCoord texCoord;
 	}
 
 	struct VkTestUniformBufferObject {
@@ -78,19 +85,23 @@ private:
 	Buffer[] _uboBuffers;
 	Pipeline _pipeline;
 
+	Image _testTextureImage;
+	Sampler _testTextureSampler;
+
 	CommandBuffer[] _commandBuffers;
 
 	enum Bindings : uint {
 		vertex = 0, // Basically just a misc
-		uniformBufferObject = 0
+		uniformBufferObject = 0,
+		testTexture
 	}
 
 	// dfmt off
 	VkTestShaderDataVertex[] _vertices = [
-		VkTestShaderDataVertex(Position(-0.5f, -0.5f), Color(ubyte.max, ubyte.min, ubyte.min)),
-		VkTestShaderDataVertex(Position(0.5f, -0.5f), Color(ubyte.min, ubyte.max, ubyte.min)),
-		VkTestShaderDataVertex(Position(0.5f, 0.5f), Color(ubyte.min, ubyte.min, ubyte.max)),
-		VkTestShaderDataVertex(Position(-0.5f, 0.5f), Color(ubyte.max, ubyte.max, ubyte.max))
+		VkTestShaderDataVertex(Position(-0.5f, -0.5f), Color(ubyte.max, ubyte.min, ubyte.min), TexCoord(1.0f, 0.0f)),
+		VkTestShaderDataVertex(Position(0.5f, -0.5f), Color(ubyte.min, ubyte.max, ubyte.min), TexCoord(0.0f, 0.0f)),
+		VkTestShaderDataVertex(Position(0.5f, 0.5f), Color(ubyte.min, ubyte.min, ubyte.max), TexCoord(0.0f, 1.0f)),
+		VkTestShaderDataVertex(Position(-0.5f, 0.5f), Color(ubyte.max, ubyte.max, ubyte.max), TexCoord(1.0f, 1.0f))
 	];
 	ushort[] _indices = [
 		0, 1, 2,
@@ -219,6 +230,72 @@ private:
 		}
 	}
 
+	void _createTextures() {
+
+		import rebel.input.filesystem;
+
+		FileSystem fs = Engine.instance.fileSystem;
+
+		{
+			import derelict.sdl2.sdl;
+			import derelict.sdl2.image;
+
+			ubyte[] data;
+			{
+				FSFile file = fs.open("vktest/testTexture.jpg", FileMode.read);
+				scope (exit)
+					file.destroy;
+
+				data.length = file.length;
+				file.read(data);
+			}
+
+			SDL_Surface* surf;
+			{
+				SDL_Surface* tmp = IMG_Load_RW(SDL_RWFromConstMem(data.ptr, cast(int)data.length), true);
+				assert(tmp);
+
+				surf = SDL_ConvertSurfaceFormat(tmp, SDL_PIXELFORMAT_RGBA32, 0);
+				assert(surf);
+
+				SDL_FreeSurface(tmp);
+			}
+
+			ImageTemplate imageTemplate;
+			{
+				ImageTemplateBuilder templateBuilder;
+				templateBuilder.name = "testTexture.jpg - Image Template";
+				templateBuilder.readOnly = true;
+				templateBuilder.format = ImageFormat.rgba8_unorm;
+				templateBuilder.samples = 1;
+				templateBuilder.size = vec2ui(surf.w, surf.h);
+				templateBuilder.usage = ImageUsage.transferDst;
+
+				imageTemplate = _renderer.construct(templateBuilder);
+			}
+
+			{
+				ImageBuilder builder;
+				builder.name = "testTexture.jpg - Image";
+				builder.imageTemplate = imageTemplate;
+
+				_testTextureImage = _renderer.construct(builder);
+			}
+
+			{
+				scope Image.Ref imageRef = _renderer.get(_testTextureImage);
+				ImageData* image = imageRef.get();
+				image.setData(surf.pixels[0 .. surf.h * surf.pitch]);
+			}
+
+			{
+				SamplerBuilder builder;
+				builder.name = "testTexture.jpg";
+				_testTextureSampler = _renderer.construct(builder);
+			}
+		}
+	}
+
 	void _createPipeline() {
 		PipelineBuilder builder;
 		builder.name = "Main Pipeline";
@@ -233,9 +310,12 @@ private:
 
 		alias vktestUBO = ShaderInputInfo!VkTestUniformBufferObject;
 		builder.descriptorSetLayoutBindings ~= vktestUBO.getDescriptorSetLayoutBinding(Bindings.uniformBufferObject, ShaderStages.vertex);
+		builder.descriptorSetLayoutBindings ~= getDescriptorSetLayoutBinding(_testTextureSampler, Bindings.testTexture, ShaderStages.fragment);
 
 		foreach (i, uboBuffer; _uboBuffers)
 			builder.descriptorBufferInfos ~= vktestUBO.getDescriptorBufferInfo(uboBuffer, Bindings.uniformBufferObject);
+
+		builder.descriptorImageInfos ~= getDescriptorBufferInfo(_testTextureImage, _testTextureSampler, Bindings.testTexture);
 
 		builder.vertexTopology = VertexTopology.triangleList;
 

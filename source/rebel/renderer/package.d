@@ -42,6 +42,7 @@ interface IRenderer {
 	ImageTemplate construct(ref ImageTemplateBuilder builder);
 	Pipeline construct(ref PipelineBuilder builder);
 	RenderPass construct(ref RenderPassBuilder builder);
+	Sampler construct(ref SamplerBuilder builder);
 	ShaderModule construct(ref ShaderModuleBuilder builder);
 
 	Buffer.Ref get(Buffer handler);
@@ -51,6 +52,7 @@ interface IRenderer {
 	ImageTemplate.Ref get(ImageTemplate handler);
 	Pipeline.Ref get(Pipeline handler);
 	RenderPass.Ref get(RenderPass handler);
+	Sampler.Ref get(Sampler handler);
 	ShaderModule.Ref get(ShaderModule handler);
 
 	void destruct(Buffer handler);
@@ -60,6 +62,7 @@ interface IRenderer {
 	void destruct(ImageTemplate handler);
 	void destruct(Pipeline handler);
 	void destruct(RenderPass handler);
+	void destruct(Sampler handler);
 	void destruct(ShaderModule handler);
 
 	@property ImageTemplate framebufferImageTemplate();

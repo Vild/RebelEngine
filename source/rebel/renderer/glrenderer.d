@@ -59,6 +59,7 @@ public:
 	ImageTemplate construct(ref ImageTemplateBuilder builder) { return _imageTemplates.create(builder); }
 	Pipeline construct(ref PipelineBuilder builder) { return _pipelines.create(builder); }
 	RenderPass construct(ref RenderPassBuilder builder) { return _renderPasses.create(builder); }
+	Sampler construct(ref SamplerBuilder builder) { return _samplers.create(builder); }
 	ShaderModule construct(ref ShaderModuleBuilder builder) { return _shaderModules.create(builder); }
 
 	Buffer.Ref get(Buffer handler) { return _buffers.get(handler); }
@@ -68,6 +69,7 @@ public:
 	ImageTemplate.Ref get(ImageTemplate handler) { return _imageTemplates.get(handler); }
 	Pipeline.Ref get(Pipeline handler) { return _pipelines.get(handler); }
 	RenderPass.Ref get(RenderPass handler) { return _renderPasses.get(handler); }
+	Sampler.Ref get(Sampler handler) { return _samplers.get(handler); }
 	ShaderModule.Ref get(ShaderModule handler) { return _shaderModules.get(handler); }
 
 	void destruct(CommandBuffer handler) { return _commandBuffers.remove(handler); }
@@ -77,6 +79,7 @@ public:
 	void destruct(ImageTemplate handler) { return _imageTemplates.remove(handler); }
 	void destruct(Pipeline handler) { return _pipelines.remove(handler); }
 	void destruct(RenderPass handler) { return _renderPasses.remove(handler); }
+	void destruct(Sampler handler) { return _samplers.remove(handler); }
 	void destruct(ShaderModule handler) { return _shaderModules.remove(handler); }
 	// dfmt on
 
@@ -123,6 +126,7 @@ private:
 	HandleStorage!(ImageTemplate, GLDummyData!(ImageTemplateData, ImageTemplateBuilder)) _imageTemplates;
 	HandleStorage!(Pipeline, GLDummyData!(PipelineData, PipelineBuilder)) _pipelines;
 	HandleStorage!(RenderPass, GLDummyData!(RenderPassData, RenderPassBuilder)) _renderPasses;
+	HandleStorage!(Sampler, GLDummyData!(SamplerData, SamplerBuilder)) _samplers;
 	HandleStorage!(ShaderModule, GLDummyData!(ShaderModuleData, ShaderModuleBuilder)) _shaderModules;
 
 	Framebuffer _outputFramebuffer;

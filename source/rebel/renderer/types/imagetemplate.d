@@ -46,9 +46,9 @@ size_t getBitsPerChannel(ImageFormat f) {
 }
 
 enum ImageUsage {
-	/*transferSrc,
+	/*transferSrc,*/
 	transferDst,
-	sampled,
+	/*sampled,
 	storage,*/
 	presentAttachment,
 	colorAttachment,
@@ -64,7 +64,7 @@ enum ImageLayout {
 	depthStencil, // depth(Stencil)Attachment
 	depthStencilReadOnly, // depth(Stencil)Attachment + readonly
 	//transferSrc, // transferSrc
-	//transferDst, // transferDst
+	transferDst, // transferDst
 	present, // presentAttachment
 }
 
