@@ -20,7 +20,11 @@ enum ImageFormat {
 	bgr8_unorm,
 	bgra8_unorm,
 
-	a2r10g10b10_float // HDR
+	a2r10g10b10_float, // HDR
+
+	d32_sfloat,
+	d32_s8_sfloat,
+	d24_s8_unorm
 }
 
 //TODO: move!!
@@ -41,7 +45,11 @@ size_t getBitsPerChannel(ImageFormat f) {
 	case ImageFormat.rgb32_float:
 	case ImageFormat.rgba32_float:
 	case ImageFormat.a2r10g10b10_float:
+	case ImageFormat.d32_sfloat:
+	case ImageFormat.d24_s8_unorm:
 		return 32;
+	case ImageFormat.d32_s8_sfloat:
+		return 40;
 	}
 }
 

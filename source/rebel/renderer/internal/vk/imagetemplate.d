@@ -49,10 +49,10 @@ struct VKImageTemplateData {
 			break;
 		case ImageUsage.depthAttachment:
 			aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
-			//base.layout = ImageLayout.depthStencil;
-			goto case;
+			base.layout = ImageLayout.depthStencil;
+			break;
 		case ImageUsage.depthStencilAttachment:
-			aspectMask |= VkImageAspectFlagBits.VK_IMAGE_ASPECT_STENCIL_BIT;
+			aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT | VkImageAspectFlagBits.VK_IMAGE_ASPECT_STENCIL_BIT;
 			base.layout = ImageLayout.depthStencil;
 			break;
 		}

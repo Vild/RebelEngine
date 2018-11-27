@@ -259,8 +259,11 @@ public:
 	void destruct(ShaderModule handle) { assert(!handle.isValid); return _shaderModules.remove(handle); }
 	// dfmt on
 
-	@property ImageTemplate framebufferImageTemplate() {
-		return _device.fbImageTemplate;
+	@property ImageTemplate framebufferColorImageTemplate() {
+		return _device.fbColorImageTemplate;
+	}
+	@property ImageTemplate framebufferDepthImageTemplate() {
+		return _device.fbDepthImageTemplate;
 	}
 
 	@property void outputRenderPass(RenderPass renderpass) {

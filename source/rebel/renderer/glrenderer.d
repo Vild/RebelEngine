@@ -83,7 +83,11 @@ public:
 	void destruct(ShaderModule handler) { return _shaderModules.remove(handler); }
 	// dfmt on
 
-	@property ImageTemplate framebufferImageTemplate() {
+	@property ImageTemplate framebufferColorImageTemplate() {
+		return ImageTemplate();
+	}
+
+	@property ImageTemplate framebufferDepthImageTemplate() {
 		return ImageTemplate();
 	}
 

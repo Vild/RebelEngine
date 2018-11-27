@@ -62,7 +62,7 @@ final override:
 		cbData.renderArea = renderArea;
 	}
 
-	@property void clearColors(vec4f[] clearColors) {
+	@property void clearColors(ClearValue[] clearColors) {
 		cbData.clearColors = clearColors;
 	}
 
@@ -79,8 +79,11 @@ final override:
 		}
 		VkClearValue[] clearValues;
 		clearValues.length = cbData.clearColors.length;
-		foreach (i, vec4f color; cbData.clearColors)
-			clearValues[i].color = VkClearColorValue([color.r, color.g, color.b, color.a]);
+		foreach (i, ClearValue color; cbData.clearColors)
+			if (auto c = color.peek!ClearColorValue)
+				clearValues[i].color = VkClearColorValue([c.r, c.g, c.b, c.a]);
+			else if (auto d = color.peek!ClearDepthValue)
+				clearValues[i].depthStencil = VkClearDepthStencilValue(d.depth, d.stencil);
 
 		VkRenderPassBeginInfo info;
 		info.renderPass = rp;
@@ -173,7 +176,7 @@ struct VKCommandBufferData {
 	Pipeline pipeline;
 	Framebuffer framebuffer;
 	vec4ui renderArea;
-	vec4f[] clearColors;
+	ClearValue[] clearColors;
 
 	this(const ref CommandBufferBuilder builder, VKDevice* device) {
 		this.builder = builder;

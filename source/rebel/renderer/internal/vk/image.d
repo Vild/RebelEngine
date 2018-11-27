@@ -50,7 +50,9 @@ struct VKImageData {
 			imageCreate.arrayLayers = 1;
 			imageCreate.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
 			imageCreate.tiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL;
-			imageCreate.usage = data.usage.translate | VK_IMAGE_USAGE_SAMPLED_BIT;
+			imageCreate.usage = data.usage.translate;
+			if (data.usage < ImageUsage.depthAttachment)
+				imageCreate.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 			imageCreate.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
 			imageCreate.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
 
@@ -70,7 +72,6 @@ struct VKImageData {
 		createinfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
 		createinfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
 		createinfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-		createinfo.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
 		createinfo.subresourceRange.aspectMask = data.aspectMask;
 		createinfo.subresourceRange.baseMipLevel = 0;
 		createinfo.subresourceRange.levelCount = 1;

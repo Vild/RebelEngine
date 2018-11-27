@@ -53,12 +53,15 @@ struct VKDevice {
 	VkQueue presentQueue;
 
 	VkSurfaceFormatKHR swapChainImageFormat;
+	VkFormat depthImageFormat;
 	VkExtent2D swapChainExtent;
 	VkSwapchainKHR swapChain;
 	VkImage[] swapChainImages;
 
-	ImageTemplate fbImageTemplate;
+	ImageTemplate fbColorImageTemplate;
+	ImageTemplate fbDepthImageTemplate;
 	Image[] fbImages;
+	Image fbDepthImage;
 	RenderPass fbRenderPass;
 	Framebuffer[] framebuffers;
 
@@ -269,6 +272,17 @@ private:
 		}(swapChainInfo.formats);
 		swapChainImageFormat = surfaceFormat;
 
+		depthImageFormat = () {
+			foreach (VkFormat format; [VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT]) {
+				VkFormatProperties props;
+				vkGetPhysicalDeviceFormatProperties(device, format, &props);
+
+				if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+					return format;
+			}
+			return VK_FORMAT_D32_SFLOAT;
+		}();
+
 		VkPresentModeKHR presentMode = (VkPresentModeKHR[] presentModes) {
 			VkPresentModeKHR bestMode = VkPresentModeKHR.VK_PRESENT_MODE_FIFO_KHR;
 			foreach (VkPresentModeKHR pm; presentModes)
@@ -300,19 +314,32 @@ private:
 			imageCount = swapChainInfo.capabilities.maxImageCount;
 
 		if (recreate) {
-			scope ImageTemplate.Ref itRef = renderer.get(fbImageTemplate);
-			auto data = itRef.get!VKImageTemplateData();
-			data.builder.format = swapChainImageFormat.format.translate;
-			data.builder.size = vec2ui(swapChainExtent.width, swapChainExtent.height);
+			scope ImageTemplate.Ref itColorRef = renderer.get(fbColorImageTemplate);
+			auto dataColor = itColorRef.get!VKImageTemplateData();
+			dataColor.builder.format = swapChainImageFormat.format.translate;
+			dataColor.builder.size = vec2ui(swapChainExtent.width, swapChainExtent.height);
+
+			scope ImageTemplate.Ref itDepthRef = renderer.get(fbColorImageTemplate);
+			auto dataDepth = itDepthRef.get!VKImageTemplateData();
+			dataDepth.builder.format = depthImageFormat.translate;
+			dataDepth.builder.size = vec2ui(swapChainExtent.width, swapChainExtent.height);
 		} else {
 			ImageTemplateBuilder builder;
-			builder.name = "SwapChain Image Template";
+			builder.name = "SwapChain Color Image Template";
 			builder.format = swapChainImageFormat.format.translate;
 			builder.samples = 1;
 			builder.size = vec2ui(swapChainExtent.width, swapChainExtent.height);
 			builder.usage = ImageUsage.presentAttachment;
 
-			fbImageTemplate = renderer.construct(builder);
+			fbColorImageTemplate = renderer.construct(builder);
+
+			builder.name = "SwapChain Depth Image Template";
+			builder.format = depthImageFormat.translate;
+			builder.samples = 1;
+			builder.size = vec2ui(swapChainExtent.width, swapChainExtent.height);
+			builder.usage = ImageUsage.depthAttachment;
+
+			fbDepthImageTemplate = renderer.construct(builder);
 		}
 
 		VkSwapchainCreateInfoKHR createInfo;
@@ -365,12 +392,11 @@ private:
 				imgRef.get!VKImageData().image = image;
 			}
 		}
-
 	}
 
 	void _createImageViews() {
 		ImageBuilder builder;
-		builder.imageTemplate = fbImageTemplate;
+		builder.imageTemplate = fbColorImageTemplate;
 		fbImages.length = swapChainImages.length;
 		foreach (i, image; swapChainImages) {
 			import std.format : format;
@@ -378,10 +404,44 @@ private:
 			builder.name = format("Swapchain ImageView for output #%d", i);
 			fbImages[i] = renderer.construct(builder, image);
 		}
+
 	}
 
 	void _createFramebuffers(bool recreate = false) {
 		assert(fbRenderPass.isValid);
+
+		if (!fbDepthImage.isValid) {
+			ImageBuilder builder;
+			builder.name = "Swapchain Depth image";
+			builder.imageTemplate = fbDepthImageTemplate;
+			fbDepthImage = renderer.construct(builder);
+
+			VkFormat format = renderer.get(fbDepthImageTemplate).get!VKImageTemplateData().format;
+
+			auto cb = beginSingleTimeCommands();
+			{
+				VkImageMemoryBarrier barrier;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.image = renderer.get(fbDepthImage).get!VKImageData().image;
+				alias isStencil = (VkFormat format) => format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | (isStencil(format) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0);
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+				barrier.srcAccessMask = 0;
+				barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+				VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+
+				dispatch.vkCmdPipelineBarrier(cb, sourceStage, destinationStage, 0, 0, null, 0, null, 1, &barrier);
+			}
+			endSingleTimeCommands();
+		}
 
 		framebuffers.length = fbImages.length;
 		foreach (i, Image image; fbImages) {
@@ -389,7 +449,7 @@ private:
 
 			FramebufferBuilder builder;
 			builder.name = format("Framebuffer for output #%d", i);
-			builder.attachments = [image];
+			builder.attachments = [image, fbDepthImage];
 			builder.dimension = vec3ui(swapChainExtent.width, swapChainExtent.height, 1);
 			builder.renderPass = fbRenderPass;
 			framebuffers[i] = renderer.construct(builder);

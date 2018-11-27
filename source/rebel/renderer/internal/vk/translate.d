@@ -30,6 +30,13 @@ VkFormat translate(ImageFormat format) {
 
 	case ImageFormat.a2r10g10b10_float:
 		return VkFormat.VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+
+	case ImageFormat.d32_sfloat:
+		return VkFormat.VK_FORMAT_D32_SFLOAT;
+	case ImageFormat.d32_s8_sfloat:
+		return VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT;
+	case ImageFormat.d24_s8_unorm:
+		return VkFormat.VK_FORMAT_D24_UNORM_S8_UINT;
 	}
 }
 
@@ -59,6 +66,17 @@ ImageFormat translate(VkFormat format) {
 		return ImageFormat.bgr8_unorm;
 	case VkFormat.VK_FORMAT_B8G8R8A8_UNORM:
 		return ImageFormat.bgra8_unorm;
+
+	case VkFormat.VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+		return ImageFormat.a2r10g10b10_float;
+
+	case VkFormat.VK_FORMAT_D32_SFLOAT:
+		return ImageFormat.d32_sfloat;
+	case VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT:
+		return ImageFormat.d32_s8_sfloat;
+	case VkFormat.VK_FORMAT_D24_UNORM_S8_UINT:
+		return ImageFormat.d24_s8_unorm;
+
 	default:
 		import std.format : f = format;
 

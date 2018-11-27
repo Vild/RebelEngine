@@ -65,7 +65,8 @@ interface IRenderer {
 	void destruct(Sampler handler);
 	void destruct(ShaderModule handler);
 
-	@property ImageTemplate framebufferImageTemplate();
+	@property ImageTemplate framebufferColorImageTemplate();
+	@property ImageTemplate framebufferDepthImageTemplate();
 	@property void outputRenderPass(RenderPass renderpass);
 
 	@property Framebuffer[] outputFramebuffers();

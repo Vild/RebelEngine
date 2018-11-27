@@ -60,7 +60,7 @@ class TestState : IEngineState {
 	}
 
 private:
-	alias Position = VertexShaderData!(vec2f, ImageFormat.rg32_float);
+	alias Position = VertexShaderData!(vec3f, ImageFormat.rgb32_float);
 	alias Color = VertexShaderData!(vec3ub, ImageFormat.rgb8_unorm);
 	alias TexCoord = VertexShaderData!(vec2f, ImageFormat.rg32_float);
 
@@ -79,6 +79,7 @@ private:
 	IRenderer _renderer;
 	IView _view;
 
+	Image _depthImage;
 	RenderPass _renderPass;
 	ShaderModule _vertexShaderModule, _fragmentShaderModule;
 	Buffer _verticesBuffer, _indicesBuffer;
@@ -98,21 +99,29 @@ private:
 
 	// dfmt off
 	VkTestShaderDataVertex[] _vertices = [
-		VkTestShaderDataVertex(Position(-0.5f, -0.5f), Color(ubyte.max, ubyte.min, ubyte.min), TexCoord(1.0f, 0.0f)),
-		VkTestShaderDataVertex(Position(0.5f, -0.5f), Color(ubyte.min, ubyte.max, ubyte.min), TexCoord(0.0f, 0.0f)),
-		VkTestShaderDataVertex(Position(0.5f, 0.5f), Color(ubyte.min, ubyte.min, ubyte.max), TexCoord(0.0f, 1.0f)),
-		VkTestShaderDataVertex(Position(-0.5f, 0.5f), Color(ubyte.max, ubyte.max, ubyte.max), TexCoord(1.0f, 1.0f))
+		VkTestShaderDataVertex(Position(-0.5f, -0.5f, 0.0f), Color(ubyte.max, ubyte.min, ubyte.min), TexCoord(1.0f, 0.0f)),
+		VkTestShaderDataVertex(Position(0.5f, -0.5f, 0.0f), Color(ubyte.min, ubyte.max, ubyte.min), TexCoord(0.0f, 0.0f)),
+		VkTestShaderDataVertex(Position(0.5f, 0.5f, 0.0f), Color(ubyte.min, ubyte.min, ubyte.max), TexCoord(0.0f, 1.0f)),
+		VkTestShaderDataVertex(Position(-0.5f, 0.5f, 0.0f), Color(ubyte.max, ubyte.max, ubyte.max), TexCoord(1.0f, 1.0f)),
+
+		VkTestShaderDataVertex(Position(-0.5f, -0.5f, -0.5f), Color(ubyte.max, ubyte.min, ubyte.min), TexCoord(1.0f, 0.0f)),
+		VkTestShaderDataVertex(Position(0.5f, -0.5f, -0.5f), Color(ubyte.min, ubyte.max, ubyte.min), TexCoord(0.0f, 0.0f)),
+		VkTestShaderDataVertex(Position(0.5f, 0.5f, -0.5f), Color(ubyte.min, ubyte.min, ubyte.max), TexCoord(0.0f, 1.0f)),
+		VkTestShaderDataVertex(Position(-0.5f, 0.5f, -0.5f), Color(ubyte.max, ubyte.max, ubyte.max), TexCoord(1.0f, 1.0f)),
 	];
 	ushort[] _indices = [
 		0, 1, 2,
-		2, 3, 0
+		2, 3, 0,
+
+		4, 5, 6,
+		6, 7, 4
 	];
 	// dfmt on
 
 	void _createRenderpass() {
 		Attachment* colorAttachment = new Attachment;
 		{
-			colorAttachment.imageTemplate = _renderer.framebufferImageTemplate;
+			colorAttachment.imageTemplate = _renderer.framebufferColorImageTemplate;
 			colorAttachment.loadOp = LoadOperation.clear;
 			colorAttachment.storeOp = StoreOperation.store;
 			colorAttachment.stencilLoadOp = LoadOperation.dontCare;
@@ -121,10 +130,22 @@ private:
 			colorAttachment.finalLayout = ImageLayout.present;
 		}
 
+		Attachment* depthAttachment = new Attachment;
+		{
+			depthAttachment.imageTemplate = _renderer.framebufferDepthImageTemplate;
+			depthAttachment.loadOp = LoadOperation.clear;
+			depthAttachment.storeOp = StoreOperation.dontCare;
+			depthAttachment.stencilLoadOp = LoadOperation.dontCare;
+			depthAttachment.stencilStoreOp = StoreOperation.dontCare;
+			depthAttachment.initialLayout = ImageLayout.undefined;
+			depthAttachment.finalLayout = ImageLayout.depthStencil;
+		}
+
 		Subpass* subpass = new Subpass;
 		{
 			subpass.bindPoint = SubpassBindPoint.graphics;
 			subpass.colorOutput = [SubpassAttachment(colorAttachment, ImageLayout.color)];
+			subpass.depthStencilOutput = [SubpassAttachment(depthAttachment, ImageLayout.depthStencil)];
 		}
 
 		SubpassDependency dependency;
@@ -139,7 +160,7 @@ private:
 
 		RenderPassBuilder builder;
 		builder.name = "Main RenderPass";
-		builder.attachments = [colorAttachment];
+		builder.attachments = [colorAttachment, depthAttachment];
 		builder.subpasses = [subpass];
 		builder.dependencies = [dependency];
 
@@ -363,7 +384,7 @@ private:
 					rs.framebuffer = fb;
 					rs.pipeline = _pipeline;
 					rs.renderArea = vec4ui(0, 0, size.x, size.y);
-					rs.clearColors = [vec4f(34 / 255.0f, 0, 34 / 255.0f, 1.0f)];
+					rs.clearColors = [ClearValue(ClearColorValue(34 / 255.0f, 0, 34 / 255.0f, 1.0f)), ClearValue(ClearDepthValue(1, 0))];
 
 					rs.finalizeState();
 

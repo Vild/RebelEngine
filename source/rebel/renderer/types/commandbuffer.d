@@ -17,13 +17,23 @@ enum IndexType {
 	u32
 }
 
+import std.variant : Algebraic;
+
+alias ClearColorValue = vec4f;
+struct ClearDepthValue {
+	float depth;
+	int stencil;
+}
+
+alias ClearValue = Algebraic!(ClearColorValue, ClearDepthValue);
+
 interface ICommandBufferRecordingState {
 	@property void index(size_t index);
 	@property void renderPass(RenderPass renderPass);
 	@property void pipeline(Pipeline pipeline);
 	@property void framebuffer(Framebuffer framebuffer);
 	@property void renderArea(vec4ui renderArea);
-	@property void clearColors(vec4f[] clearColors);
+	@property void clearColors(ClearValue[] clearColors);
 
 	void finalizeState();
 

@@ -57,9 +57,20 @@ struct VKRenderPassData {
 				attach.layout = sa.layout.translate;
 			}
 
+			VkAttachmentReference[] depthStencilAttachments;
+			depthStencilAttachments.length = sp.depthStencilOutput.length;
+			foreach (idx2, const ref SubpassAttachment sa; sp.depthStencilOutput) {
+				import std.algorithm : countUntil;
+
+				VkAttachmentReference* attach = &depthStencilAttachments[idx2];
+				attach.attachment = cast(uint)builder.attachments.countUntil(sa.attachment);
+				attach.layout = sa.layout.translate;
+			}
+
 			subpass.pipelineBindPoint = sp.bindPoint.translate;
 			subpass.colorAttachmentCount = cast(uint)colorAttachments.length;
 			subpass.pColorAttachments = colorAttachments.ptr;
+			subpass.pDepthStencilAttachment = depthStencilAttachments.ptr;
 		}
 
 		VkSubpassDependency[] dependencies;
