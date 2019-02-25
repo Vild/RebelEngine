@@ -10,6 +10,7 @@ rebelengine.lib
 rebelengine-test-*
 *.exe
 *.o
+*.a
 *.obj
 *.lst
 .gdb_history

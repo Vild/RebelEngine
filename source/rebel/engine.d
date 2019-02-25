@@ -179,18 +179,29 @@ public:
 				_currentState = _nextState;
 				_nextState = null;
 			}
+
+			if (_fpsLimit) {
+				import derelict.sdl2.sdl;
+
+				long delay = (1000 / _fpsLimit) - (MonoTime.currTime - curTime).total!"msecs";
+				if (delay > 0)
+					SDL_Delay(cast(uint)delay);
+			}
 		}
 		if (_currentState) {
 			_currentState.exit(null);
 			_currentState.destroy;
 			_currentState = null;
 		}
-//{assert(0, "QUITING");}
 		return 0;
 	}
 
 	void pushEvent(Event event) {
 		_events ~= event;
+	}
+
+	@property size_t fpsLimit() {
+		return _fpsLimit;
 	}
 
 	@property FileSystem fileSystem() {
@@ -229,6 +240,7 @@ private:
 	static Engine _instance;
 	MonoTime _oldTime;
 	FileSystem _fileSystem;
+	size_t _fpsLimit = 60;
 
 	IView _view;
 	IRenderer _renderer;

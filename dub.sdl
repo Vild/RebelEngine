@@ -16,6 +16,7 @@ subPackage "lib/vulkan_memory_allocator"
 
 # Rendering
 dependency "derelict-sdl2" version="~>3.1.0-alpha.4"
+dependency "derelict-assimp3" version="~>2.0.0-beta.1"
 dependency ":cimgui" version="*"
 //dependency ":imgui_extensions" version="*"
 dependency ":vulkan_memory_allocator" version="*"
