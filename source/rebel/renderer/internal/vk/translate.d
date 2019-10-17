@@ -1,6 +1,7 @@
 module rebel.renderer.internal.vk.translate;
 
 import erupted;
+import vulkan_memory_allocator;
 
 import rebel.renderer.types;
 
@@ -338,4 +339,98 @@ VkShaderStageFlags translate(ShaderStages ss) {
 		output |= VkShaderStageFlagBits.VK_SHADER_STAGE_ALL_GRAPHICS;
 
 	return output;
+}
+
+VkBlendFactor translate(BlendFactor bf) {
+	final switch (bf) {
+	case BlendFactor.zero:
+		return VkBlendFactor.VK_BLEND_FACTOR_ZERO;
+	case BlendFactor.one:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE;
+	case BlendFactor.srcColor:
+		return VkBlendFactor.VK_BLEND_FACTOR_SRC_COLOR;
+	case BlendFactor.oneMinusSrcColor:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+	case BlendFactor.dstColor:
+		return VkBlendFactor.VK_BLEND_FACTOR_DST_COLOR;
+	case BlendFactor.oneMinusDstColor:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+	case BlendFactor.srcAlpha:
+		return VkBlendFactor.VK_BLEND_FACTOR_SRC_ALPHA;
+	case BlendFactor.oneMinusSrcAlpha:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	case BlendFactor.dstAlpha:
+		return VkBlendFactor.VK_BLEND_FACTOR_DST_ALPHA;
+	case BlendFactor.oneMinusDstAlpha:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+	case BlendFactor.constantColor:
+		return VkBlendFactor.VK_BLEND_FACTOR_CONSTANT_COLOR;
+	case BlendFactor.oneMinusConstantColor:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+	case BlendFactor.constantAlpha:
+		return VkBlendFactor.VK_BLEND_FACTOR_CONSTANT_ALPHA;
+	case BlendFactor.oneMinusConstantAlpha:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
+	case BlendFactor.srcAlphaSaturate:
+		return VkBlendFactor.VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+	case BlendFactor.src1Color:
+		return VkBlendFactor.VK_BLEND_FACTOR_SRC1_COLOR;
+	case BlendFactor.oneMinusSrc1Color:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
+	case BlendFactor.src1Alpha:
+		return VkBlendFactor.VK_BLEND_FACTOR_SRC1_ALPHA;
+	case BlendFactor.oneMinusSrc1Alpha:
+		return VkBlendFactor.VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+	}
+}
+
+VkBlendOp translate(BlendOp bo) {
+	final switch (bo) {
+	case BlendOp.add:
+		return VkBlendOp.VK_BLEND_OP_ADD;
+	case BlendOp.subtract:
+		return VkBlendOp.VK_BLEND_OP_SUBTRACT;
+	case BlendOp.reverseSubtract:
+		return VkBlendOp.VK_BLEND_OP_REVERSE_SUBTRACT;
+	case BlendOp.min:
+		return VkBlendOp.VK_BLEND_OP_MIN;
+	case BlendOp.max:
+		return VkBlendOp.VK_BLEND_OP_MAX;
+	}
+}
+
+VkDynamicState translate(DynamicState ds) {
+	final switch (ds) {
+	case DynamicState.viewport:
+		return VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT;
+	case DynamicState.scissor:
+		return VkDynamicState.VK_DYNAMIC_STATE_SCISSOR;
+	case DynamicState.lineWidth:
+		return VkDynamicState.VK_DYNAMIC_STATE_LINE_WIDTH;
+	case DynamicState.depthBias:
+		return VkDynamicState.VK_DYNAMIC_STATE_DEPTH_BIAS;
+	case DynamicState.blendConstants:
+		return VkDynamicState.VK_DYNAMIC_STATE_BLEND_CONSTANTS;
+	case DynamicState.depthBounds:
+		return VkDynamicState.VK_DYNAMIC_STATE_DEPTH_BOUNDS;
+	case DynamicState.stencilCompareMask:
+		return VkDynamicState.VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK;
+	case DynamicState.stencilWriteMask:
+		return VkDynamicState.VK_DYNAMIC_STATE_STENCIL_WRITE_MASK;
+	case DynamicState.stencilReference:
+		return VkDynamicState.VK_DYNAMIC_STATE_STENCIL_REFERENCE;
+	}
+}
+
+VmaMemoryUsage translate(MemoryUsage mu) {
+	final switch (mu) {
+	case MemoryUsage.gpuOnly:
+		return VmaMemoryUsage.VMA_MEMORY_USAGE_GPU_ONLY;
+	case MemoryUsage.cpuOnly:
+		return VmaMemoryUsage.VMA_MEMORY_USAGE_CPU_ONLY;
+	case MemoryUsage.cpuToGPU:
+		return VmaMemoryUsage.VMA_MEMORY_USAGE_CPU_TO_GPU;
+	case MemoryUsage.gpuToCPU:
+		return VmaMemoryUsage.VMA_MEMORY_USAGE_GPU_TO_CPU;
+	}
 }

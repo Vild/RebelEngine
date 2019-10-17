@@ -2,14 +2,11 @@ module rebel.social.discord;
 
 import rebel.social;
 
-import derelict.discord.rpc;
+import discord.rpc;
 
 import std.string;
 import std.stdio;
 
-shared static this() {
-	DerelictDiscordRPC.load();
-}
 
 class DiscordSocialStatus : ISocialService {
 public:
@@ -67,7 +64,7 @@ private:
 	}
 
 static extern (C):
-	void handleReady() {
+	void handleReady(const(DiscordUser)* request) {
 		writeln("Discord-RPC is ready.");
 	}
 
@@ -87,7 +84,7 @@ static extern (C):
 		writeln("Someone wants to spectate; secret: ", spectateSecret.fromStringz);
 	}
 
-	void handleJoinRequest(const(DiscordJoinRequest)* request) {
+	void handleJoinRequest(const(DiscordUser)* request) {
 		writeln("Received a join request from ", request.username.fromStringz, " (ID: ", request.userId, ")");
 	}
 }

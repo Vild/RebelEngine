@@ -244,11 +244,12 @@ private:
 		vulkanFunctions.vkDestroyBuffer = dispatch.vkDestroyBuffer;
 		vulkanFunctions.vkCreateImage = dispatch.vkCreateImage;
 		vulkanFunctions.vkDestroyImage = dispatch.vkDestroyImage;
+		vulkanFunctions.vkCmdCopyBuffer = dispatch.vkCmdCopyBuffer;
 		vulkanFunctions.vkGetBufferMemoryRequirements2 = dispatch.vkGetBufferMemoryRequirements2;
 		vulkanFunctions.vkGetImageMemoryRequirements2 = dispatch.vkGetImageMemoryRequirements2;
 
 		VmaAllocatorCreateInfo allocatorInfo;
-		allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
+		allocatorInfo.flags |= VmaAllocatorCreateFlagBits.VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
 		allocatorInfo.physicalDevice = device;
 		allocatorInfo.device = dispatch.vkDevice;
 		allocatorInfo.pVulkanFunctions = &vulkanFunctions;
@@ -482,15 +483,17 @@ private:
 	}
 
 	void _createDescriptorPools() {
+		enum magnitude = 1000;
+
 		VkDescriptorPoolSize[] poolSizes = [
-			VkDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, cast(uint)swapChainImages.length),
-			VkDescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, cast(uint)swapChainImages.length)
+			VkDescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, cast(uint)swapChainImages.length * magnitude),
+			VkDescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, cast(uint)swapChainImages.length * magnitude)
 		];
 
 		VkDescriptorPoolCreateInfo poolInfo;
 		poolInfo.poolSizeCount = cast(uint)poolSizes.length;
 		poolInfo.pPoolSizes = poolSizes.ptr;
-		poolInfo.maxSets = cast(uint)swapChainImages.length;
+		poolInfo.maxSets = cast(uint)swapChainImages.length * magnitude;
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
 		vkAssert(dispatch.CreateDescriptorPool(&poolInfo, &descriptorPool));

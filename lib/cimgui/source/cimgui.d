@@ -2,8 +2,6 @@ module cimgui;
 
 import core.stdc.config;
 import core.stdc.stdarg : va_list;
-static import core.simd;
-static import std.conv;
 
 extern (C) {
 	struct ImVec2_Simple {

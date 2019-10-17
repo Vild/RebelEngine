@@ -13,6 +13,7 @@ preGenerateCommands "make -f assets.mk"
 subPackage "lib/cimgui"
 //subPackage "lib/imgui_extensions"
 subPackage "lib/vulkan_memory_allocator"
+subPackage "lib/physfs"
 
 # Rendering
 dependency "derelict-sdl2" version="~>3.1.0-alpha.4"
@@ -24,7 +25,7 @@ dependency "erupted" version="~>2.0.9+v1.1.83"
 dependency "opengl:gl4" version="~>1.0.0"
 
 # I/O
-dependency "derelict-physfs" version="~>3.0.0-beta.2"
+dependency ":physfs" version="*"
 
 # Type handlers
 dependency "imageformats" version="~>7.0.0"
@@ -32,4 +33,5 @@ dependency "gfm:math" version="~>7.0.5"
 dependency "sdlss" version="~>0.3.3"
 
 # Misc
-dependency "derelict_extras-discord-rpc" version="~>1.0.0"
+dependency "discord-rpc" version="~>3.3.0"
+libs "discord-rpc"

@@ -54,6 +54,12 @@ struct DescriptorSetLayoutBinding {
 	void* immutableSamplers;
 }
 
+struct PushContant {
+	ShaderStages stages;
+	uint offset;
+	uint size;
+}
+
 struct Viewport {
 	vec2f position = vec2f(0, 0);
 	vec2f size = vec2f(0, 0);
@@ -110,9 +116,45 @@ enum ColorComponent {
 	a
 }
 
+enum BlendFactor {
+	zero,
+	one,
+	srcColor,
+	oneMinusSrcColor,
+	dstColor,
+	oneMinusDstColor,
+	srcAlpha,
+	oneMinusSrcAlpha,
+	dstAlpha,
+	oneMinusDstAlpha,
+	constantColor,
+	oneMinusConstantColor,
+	constantAlpha,
+	oneMinusConstantAlpha,
+	srcAlphaSaturate,
+	src1Color,
+	oneMinusSrc1Color,
+	src1Alpha,
+	oneMinusSrc1Alpha,
+}
+
+enum BlendOp {
+	add,
+	subtract,
+	reverseSubtract,
+	min,
+	max,
+}
+
 struct BlendAttachment {
-	ColorComponent colorWriteMask;
 	bool blendEnable;
+	BlendFactor srcColorBlendFactor;
+	BlendFactor dstColorBlendFactor;
+	BlendOp colorBlendOp;
+	BlendFactor srcAlphaBlendFactor;
+	BlendFactor dstAlphaBlendFactor;
+	BlendOp alphaBlendOp;
+	ColorComponent colorWriteMask;
 }
 
 enum LogicOp {
@@ -149,6 +191,18 @@ struct DescriptorImageInfo {
 	WriteDescriptorSet writeDescriptorSet;
 }
 
+enum DynamicState {
+	viewport = 0,
+	scissor = 1,
+	lineWidth = 2,
+	depthBias = 3,
+	blendConstants = 4,
+	depthBounds = 5,
+	stencilCompareMask = 6,
+	stencilWriteMask = 7,
+	stencilReference = 8,
+}
+
 struct PipelineBuilder {
 	string name;
 
@@ -177,6 +231,8 @@ struct PipelineBuilder {
 	SampleCount multisamplingCount;
 
 	BlendState blendState;
+	PushContant[] pushContants;
+	DynamicState[] dynamicStates;
 }
 
 struct PipelineData {

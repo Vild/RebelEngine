@@ -52,7 +52,15 @@ class TestState : IEngineState {
 			buffer.setData((cast(ubyte*)&ubo)[0 .. ubo.sizeof]);
 		}
 
+{
+			scope CommandBuffer.Ref cbRef = _renderer.get(_imguiCommandBuffer);
+			CommandBufferData* data = cbRef.get();
+			data.rebuild();
+		}
+
+
 		_renderer.submit(_commandBuffers[_renderer.outputIdx]);
+		_renderer.submit(_imguiCommandBuffer);
 	}
 
 	void exit(IEngineState newState) {
@@ -90,6 +98,7 @@ private:
 	Sampler _testTextureSampler;
 
 	CommandBuffer[] _commandBuffers;
+	CommandBuffer _imguiCommandBuffer;
 
 	enum Bindings : uint {
 		vertex = 0, // Basically just a misc
@@ -176,7 +185,9 @@ private:
 
 		{
 			ShaderModuleBuilder vertexBuilder;
-			FSFile file = fs.open("vktest/base.vert.spv", FileMode.read);
+			FSFile file = fs.open("/vktest/base.vert.spv", FileMode.read);
+			scope (exit)
+				file.destroy;
 			assert(file);
 			char[] data;
 			scope (exit)
@@ -184,7 +195,7 @@ private:
 			data.length = file.length;
 			file.read(data);
 
-			vertexBuilder.name = "vktest/base.vert.spv";
+			vertexBuilder.name = "/vktest/base.vert.spv";
 			vertexBuilder.sourcecode = cast(string)data;
 			vertexBuilder.entrypoint = "main";
 			vertexBuilder.type = ShaderType.vertex;
@@ -193,7 +204,9 @@ private:
 
 		{
 			ShaderModuleBuilder fragmentBuilder;
-			FSFile file = fs.open("vktest/base.frag.spv", FileMode.read);
+			FSFile file = fs.open("/vktest/base.frag.spv", FileMode.read);
+			scope (exit)
+				file.destroy;
 			assert(file);
 			char[] data;
 			scope (exit)
@@ -201,7 +214,7 @@ private:
 			data.length = file.length;
 			file.read(data);
 
-			fragmentBuilder.name = "vktest/base.frag.spv";
+			fragmentBuilder.name = "/vktest/base.frag.spv";
 			fragmentBuilder.sourcecode = cast(string)data;
 			fragmentBuilder.entrypoint = "main";
 			fragmentBuilder.type = ShaderType.fragment;
@@ -214,7 +227,8 @@ private:
 			BufferBuilder builder;
 			builder.name = "Vertices Buffer";
 			builder.size = _vertices.length * _vertices[0].sizeof;
-			builder.usage = BufferUsage.vertex;
+			builder.bufferUsage = BufferUsage.vertex;
+			builder.memoryUsage = MemoryUsage.gpuOnly;
 			builder.sharing = BufferSharing.exclusive;
 
 			_verticesBuffer = _renderer.construct(builder);
@@ -227,7 +241,8 @@ private:
 			BufferBuilder builder;
 			builder.name = "Indices Buffer";
 			builder.size = _indices.length * _indices[0].sizeof;
-			builder.usage = BufferUsage.index;
+			builder.bufferUsage = BufferUsage.index;
+			builder.memoryUsage = MemoryUsage.gpuOnly;
 			builder.sharing = BufferSharing.exclusive;
 
 			_indicesBuffer = _renderer.construct(builder);
@@ -244,7 +259,8 @@ private:
 			BufferBuilder builder;
 			builder.name = format!"UBO Buffer - Framebuffer #%d"(i);
 			builder.size = VkTestUniformBufferObject.sizeof;
-			builder.usage = BufferUsage.uniform;
+			builder.bufferUsage = BufferUsage.uniform;
+			builder.memoryUsage = MemoryUsage.cpuToGPU;
 			builder.sharing = BufferSharing.exclusive;
 
 			uboBuffer = _renderer.construct(builder);
@@ -263,7 +279,7 @@ private:
 
 			ubyte[] data;
 			{
-				FSFile file = fs.open("vktest/testTexture.jpg", FileMode.read);
+				FSFile file = fs.open("/vktest/testTexture.jpg", FileMode.read);
 				scope (exit)
 					file.destroy;
 
@@ -285,7 +301,7 @@ private:
 			ImageTemplate imageTemplate;
 			{
 				ImageTemplateBuilder templateBuilder;
-				templateBuilder.name = "testTexture.jpg - Image Template";
+				templateBuilder.name = "/vktest/testTexture.jpg - Image Template";
 				templateBuilder.readOnly = true;
 				templateBuilder.format = ImageFormat.rgba8_unorm;
 				templateBuilder.samples = 1;
@@ -297,7 +313,7 @@ private:
 
 			{
 				ImageBuilder builder;
-				builder.name = "testTexture.jpg - Image";
+				builder.name = "/vktest/testTexture.jpg - Image";
 				builder.imageTemplate = imageTemplate;
 
 				_testTextureImage = _renderer.construct(builder);
@@ -311,7 +327,7 @@ private:
 
 			{
 				SamplerBuilder builder;
-				builder.name = "testTexture.jpg";
+				builder.name = "/vktest/testTexture.jpg";
 				_testTextureSampler = _renderer.construct(builder);
 			}
 		}
@@ -321,6 +337,7 @@ private:
 		PipelineBuilder builder;
 		builder.name = "Main Pipeline";
 		builder.renderpass = _renderPass;
+		builder.dynamicStates ~=DynamicState.viewport;
 
 		builder.shaderStages ~= _vertexShaderModule;
 		builder.shaderStages ~= _fragmentShaderModule;
@@ -354,7 +371,13 @@ private:
 		builder.multisamplingEnabled = false;
 		builder.multisamplingCount = SampleCount.Sample1;
 
-		builder.blendState.attachments = [BlendAttachment(ColorComponent.r | ColorComponent.g | ColorComponent.b | ColorComponent.a, false)];
+		{
+			auto attach = BlendAttachment();
+			attach.blendEnable = false;
+			attach.colorWriteMask = ColorComponent.r | ColorComponent.g | ColorComponent.b | ColorComponent.a;
+			builder.blendState.attachments ~= attach;
+		}
+
 		builder.blendState.logicOpEnable = false;
 		builder.blendState.logicOp = LogicOp.copy;
 		builder.blendState.blendConstants[] = 0;
@@ -384,7 +407,9 @@ private:
 					rs.framebuffer = fb;
 					rs.pipeline = _pipeline;
 					rs.renderArea = vec4ui(0, 0, size.x, size.y);
-					rs.clearColors = [ClearValue(ClearColorValue(34 / 255.0f, 0, 34 / 255.0f, 1.0f)), ClearValue(ClearDepthValue(1, 0))];
+					rs.clearColors = [
+						ClearValue(ClearColorValue(34 / 255.0f, 0, 34 / 255.0f, 1.0f)), ClearValue(ClearDepthValue(1, 0))
+					];
 
 					rs.finalizeState();
 
@@ -395,8 +420,29 @@ private:
 			}(i);
 			_commandBuffers[i] = _renderer.construct(builder);
 		}
+
+		{
+			CommandBufferBuilder builder;
+			builder.name = "Dear ImGui Commandbuffer";
+			builder.willChangeEachFrame = true;
+			builder.callback = &_rebuildImguiCommandBuffer;
+			_imguiCommandBuffer = _renderer.construct(builder);
+		}
 	}
 
+	void _rebuildImguiCommandBuffer(ICommandBufferRecordingState rs) {
+		Framebuffer fb = _renderer.outputFramebuffers[_renderer.outputIdx];
+		vec2ui size;
+		{
+			scope Framebuffer.Ref fbRef = _renderer.get(fb);
+			FramebufferData* data = fbRef.get();
+			size = data.dimension.xy;
+		}
+		rs.framebuffer = fb;
+		rs.index = _renderer.outputIdx;
+		rs.renderArea = vec4ui(0, 0, size.x, size.y);
+		Engine.instance.ui.render(rs);
+	}
 }
 
 int main(string[] args) {

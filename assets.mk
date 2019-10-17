@@ -4,8 +4,9 @@
 all: base
 
 BASE_DIR := assets/base/vktest
+IMGUI_DIR := assets/base/imgui
 
-base: $(BASE_DIR)/base.vert.spv $(BASE_DIR)/base.frag.spv
+base: $(BASE_DIR)/base.vert.spv $(BASE_DIR)/base.frag.spv $(IMGUI_DIR)/base.vert.spv $(IMGUI_DIR)/base.frag.spv
 base: $(BASE_DIR)/testTexture.jpg
 
 $(BASE_DIR)/testTexture.jpg:

@@ -1,0 +1,8 @@
+name "physfs"
+targetType "library"
+targetPath "../../bin"
+
+importPaths "source"
+sourcePaths "source"
+
+libs "/home/wild/NativeProjects/physfs/build/libphysfs.a"

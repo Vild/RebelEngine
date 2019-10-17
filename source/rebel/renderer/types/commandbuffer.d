@@ -43,6 +43,9 @@ interface ICommandBufferRecordingState {
 	void bindIndexBuffer(BufferOffset buffer, IndexType type);
 	void draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance);
 	void drawIndexed(uint indexCount, uint instanceCount, uint firstIndex, uint vertexOffset, uint firstInstance);
+
+	void pushConstants(ShaderStages stage, uint offset, void[] values);
+	void setScissor(uint offset, vec4ui[] scissors);
 }
 
 alias CommandBufferCreateCallback = void delegate(ICommandBufferRecordingState recordingState);
@@ -54,6 +57,7 @@ struct CommandBufferBuilder {
 }
 
 struct CommandBufferData {
+	void delegate() rebuild;
 }
 
 alias CommandBuffer = Handle!(CommandBufferData, 1024);

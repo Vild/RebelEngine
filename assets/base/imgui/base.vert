@@ -1,18 +1,26 @@
-#version 440 core
+#version 460 core
+#extension GL_ARB_separate_shader_objects : enable
 
-/*layout(location = 0) */in vec2 position;
-/*layout(location = 1) */in vec2 uv;
-/*layout(location = 2) */in vec4 color;
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in vec2 aUV;
+layout(location = 2) in vec4 aColor;
 
-out VertexData {
-	vec4 color;
-	vec2 uv;
-} outData;
+layout(push_constant) uniform uPushConstant {
+	vec2 uScale;
+	vec2 uTranslate;
+} pc;
 
-layout(location = 0) uniform mat4 vp;
+out gl_PerVertex {
+	vec4 gl_Position;
+};
+
+layout(location = 0) out struct {
+	vec4 Color;
+	vec2 UV;
+} Out;
 
 void main() {
-	outData.color = color;
-	outData.uv = uv;
-	gl_Position = vp * vec4(position.xy, 0, 1);
+	Out.Color = aColor;
+	Out.UV = aUV;
+	gl_Position = vec4(aPos * pc.uScale + pc.uTranslate, 0, 1);
 }

@@ -13,11 +13,19 @@ enum BufferSharing {
 	concurrent
 }
 
+enum MemoryUsage {
+	gpuOnly,
+	cpuOnly,
+	cpuToGPU,
+	gpuToCPU
+}
+
 struct BufferBuilder {
 	string name;
 	size_t size;
-	BufferUsage usage;
+	BufferUsage bufferUsage;
 	BufferSharing sharing;
+	MemoryUsage memoryUsage;
 	//TODO: Add bool isGpuOnly?
 }
 

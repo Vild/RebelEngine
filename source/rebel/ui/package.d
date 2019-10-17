@@ -2,6 +2,7 @@ module rebel.ui;
 
 import rebel.input.event;
 import rebel.renderer;
+import rebel.renderer.types.commandbuffer;
 
 import gfm.math.vector;
 
@@ -14,7 +15,7 @@ interface IUIView {
 
 interface IUIRenderer {
 	void newFrame(float delta);
-	void endRender();
+	void render(ICommandBufferRecordingState rs);
 	void processEvents(Event[] events);
 	void resetRenderer();
 

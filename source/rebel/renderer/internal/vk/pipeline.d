@@ -111,8 +111,14 @@ struct VKPipelineData {
 		colorBlendAttachments.length = builder.blendState.attachments.length;
 		foreach (idx, const BlendAttachment blendAttach; builder.blendState.attachments) {
 			VkPipelineColorBlendAttachmentState* attach = &colorBlendAttachments[idx];
-			attach.colorWriteMask = blendAttach.colorWriteMask.translate;
 			attach.blendEnable = blendAttach.blendEnable;
+			attach.srcColorBlendFactor = blendAttach.srcColorBlendFactor.translate;
+			attach.dstColorBlendFactor = blendAttach.dstColorBlendFactor.translate;
+			attach.colorBlendOp = blendAttach.colorBlendOp.translate;
+			attach.srcAlphaBlendFactor = blendAttach.srcAlphaBlendFactor.translate;
+			attach.dstAlphaBlendFactor = blendAttach.dstAlphaBlendFactor.translate;
+			attach.alphaBlendOp = blendAttach.alphaBlendOp.translate;
+			attach.colorWriteMask = blendAttach.colorWriteMask.translate;
 		}
 
 		VkPipelineColorBlendStateCreateInfo colorBlending;
@@ -141,9 +147,31 @@ struct VKPipelineData {
 		vkAssert(device.dispatch.CreateDescriptorSetLayout(&layoutInfo, &descriptorSetLayout));
 		setVkObjectName(device, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, descriptorSetLayout, builder.name);
 
+		VkDynamicState[] dynamicStates;
+		dynamicStates.length = builder.dynamicStates.length;
+
+		foreach (idx, const DynamicState bind; builder.dynamicStates)
+			dynamicStates[idx] = bind.translate;
+
+		VkPipelineDynamicStateCreateInfo dynamicStateInfo;
+		dynamicStateInfo.dynamicStateCount = cast(uint)dynamicStates.length;
+		dynamicStateInfo.pDynamicStates = dynamicStates.ptr;
+
+		VkPushConstantRange[] pushContants;
+		pushContants.length = builder.pushContants.length;
+
+		foreach (idx, const PushContant bind; builder.pushContants) {
+			VkPushConstantRange* desc = &pushContants[idx];
+			desc.stageFlags = bind.stages.translate;
+			desc.offset = bind.offset;
+			desc.size = bind.size;
+		}
+
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo;
 		pipelineLayoutInfo.setLayoutCount = 1; //TODO: Multiple?
 		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+		pipelineLayoutInfo.pushConstantRangeCount = cast(uint)pushContants.length;
+		pipelineLayoutInfo.pPushConstantRanges = pushContants.ptr;
 		vkAssert(device.dispatch.CreatePipelineLayout(&pipelineLayoutInfo, &pipelineLayout));
 		setVkObjectName(device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, pipelineLayout, builder.name);
 
@@ -165,6 +193,7 @@ struct VKPipelineData {
 		pipelineInfo.pMultisampleState = &multisampling;
 		pipelineInfo.pDepthStencilState = &depthStencil;
 		pipelineInfo.pColorBlendState = &colorBlending;
+		pipelineInfo.pDynamicState = &dynamicStateInfo;
 		pipelineInfo.layout = pipelineLayout;
 
 		{
@@ -194,7 +223,7 @@ struct VKPipelineData {
 		descriptorSets.length = device.swapChainImages.length;
 		vkAssert(device.dispatch.AllocateDescriptorSets(&allocInfo, descriptorSets.ptr));
 
-		assert(builder.descriptorBufferInfos.length == device.swapChainImages.length);
+		assert(builder.descriptorBufferInfos.length % device.swapChainImages.length == 0);
 		// TODO: calculate these sizes
 		VkDescriptorBufferInfo[] bufferInfos;
 		bufferInfos.length = builder.descriptorBufferInfos.length;

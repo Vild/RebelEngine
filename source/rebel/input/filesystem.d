@@ -1,10 +1,6 @@
 module rebel.input.filesystem;
 
-import derelict.physfs.physfs;
-
-shared static this() {
-	DerelictPHYSFS.load();
-}
+import physfs;
 
 class FSFile {
 public:
@@ -15,11 +11,11 @@ public:
 	}
 
 	ptrdiff_t read(T)(T[] output) {
-		return PHYSFS_read(_file, &output[0], T.sizeof, cast(uint)output.length);
+		return PHYSFS_readBytes(_file, &output[0], T.sizeof * cast(uint)output.length);
 	}
 
 	ptrdiff_t write(T)(T[] output) {
-		return PHYSFS_write(_file, &output[0], T.sizeof, cast(uint)output.length);
+		return PHYSFS_writeBytes(_file, &output[0], T.sizeof * cast(uint)output.length);
 	}
 
 	@property size_t position() {
@@ -39,11 +35,22 @@ public:
 	}
 
 private:
+	string _path;
+	FileMode _mode;
 	PHYSFS_File* _file;
-	bool _owner;
 
-	this(PHYSFS_File* file) {
+	this(string path, FileMode mode, PHYSFS_File* file) {
+		_path = path;
+		_mode = mode;
 		_file = file;
+		if (!file) {
+			import std.stdio : stderr;
+			import std.string : fromStringz;
+
+			PHYSFS_ErrorCode err = PHYSFS_getLastErrorCode();
+			stderr.writeln("\x1b[33;1mFile error, Path: ", path, "\tMode:", mode, "\t: (", err, ")\n", PHYSFS_getErrorByCode(err).fromStringz, "\x1b[0m");
+			throw new Exception("");
+		}
 	}
 }
 
@@ -77,19 +84,50 @@ public:
 		PHYSFS_deinit();
 	}
 
+	void tree() {
+
+		extern (C) PHYSFS_EnumerateCallbackResult printDir(void* userdata, const char* origdir, const char* fname) {
+			import std.stdio : write, writeln;
+			import std.string : fromStringz, toStringz;
+
+			size_t* indent = cast(size_t*)userdata;
+
+			foreach (_; 0 .. *indent)
+				write("  ");
+			write("→ ");
+			if (origdir[1] != '\0')
+				write(origdir.fromStringz);
+			write("/");
+			writeln(fname.fromStringz);
+
+			if (PHYSFS_isDirectory(fname)) {
+				(*indent)++;
+				PHYSFS_enumerate((origdir.fromStringz ~ fname.fromStringz).toStringz, &printDir, userdata);
+				(*indent)--;
+			}
+			return PHYSFS_EnumerateCallbackResult.PHYSFS_ENUM_OK;
+		}
+		// ...
+		size_t indent = 1;
+		PHYSFS_enumerate("/", &printDir, &indent);
+	}
+
 	FSFile open(string path, FileMode mode) {
 		import std.string : toStringz;
 		import std.path : dirName;
 
+		scope (failure)
+			return null;
+
 		final switch (mode) {
 		case FileMode.read:
-			return new FSFile(PHYSFS_openRead(path.toStringz));
+			return new FSFile(path, mode, PHYSFS_openRead(path.toStringz));
 		case FileMode.write:
 			PHYSFS_mkdir(dirName(path).toStringz);
-			return new FSFile(PHYSFS_openWrite(path.toStringz));
+			return new FSFile(path, mode, PHYSFS_openWrite(path.toStringz));
 		case FileMode.append:
 			PHYSFS_mkdir(dirName(path).toStringz);
-			return new FSFile(PHYSFS_openAppend(path.toStringz));
+			return new FSFile(path, mode, PHYSFS_openAppend(path.toStringz));
 		}
 	}
 }

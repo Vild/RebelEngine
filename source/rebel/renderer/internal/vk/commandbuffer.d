@@ -101,6 +101,14 @@ final override:
 		}
 
 		cbData.device.dispatch.vkCmdBindPipeline(cbData.commandBuffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, p.pipeline);
+		VkViewport viewport;
+		viewport.x = cbData.renderArea.x;
+		viewport.y = cbData.renderArea.y;
+		viewport.width = cbData.renderArea.z;
+		viewport.height = cbData.renderArea.w;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		cbData.device.dispatch.vkCmdSetViewport(cbData.commandBuffer, 0, 1, &viewport);
 	}
 
 	scope IRecordingSectionScope defineSectionScope(string name, vec4f color) {
@@ -156,6 +164,24 @@ final override:
 				p.pipelineLayout, 0, 1, &p.descriptorSets[cbData.index], 0, null);
 		cbData.device.dispatch.vkCmdDrawIndexed(cbData.commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
+
+	void pushConstants(ShaderStages stage, uint offset, void[] values) {
+		VKPipelineData* p;
+		{
+			scope Pipeline.Ref pRef = cbData.renderer.get(cbData.pipeline);
+			p = pRef.get!VKPipelineData();
+		}
+		cbData.device.dispatch.vkCmdPushConstants(cbData.commandBuffer, p.pipelineLayout, stage.translate, offset,
+				cast(uint)values.length, values.ptr);
+	}
+
+	void setScissor(uint offset, vec4ui[] scissors) {
+		VkRect2D[] vkScissors;
+		vkScissors.length = scissors.length;
+		foreach (i, s; scissors)
+			vkScissors[i] = VkRect2D(VkOffset2D(s.x, s.y), VkExtent2D(s.z, s.w));
+		cbData.device.dispatch.vkCmdSetScissor(cbData.commandBuffer, offset, cast(uint)vkScissors.length, vkScissors.ptr);
+	}
 }
 
 struct VKCommandBufferData {
@@ -193,7 +219,9 @@ struct VKCommandBufferData {
 
 		vkAssert(device.dispatch.AllocateCommandBuffers(&info, &commandBuffer));
 
-		create();
+		rebuild = &create;
+		if (!builder.willChangeEachFrame)
+			create();
 	}
 
 	void create() {

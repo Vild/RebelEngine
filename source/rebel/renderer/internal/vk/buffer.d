@@ -26,15 +26,13 @@ struct VKBufferData {
 	}
 
 	void create() {
-		bool isUniform = builder.usage == BufferUsage.uniform;
-
 		VkBufferCreateInfo createInfo;
 		createInfo.size = builder.size;
-		createInfo.usage = builder.usage.translate | (isUniform ? 0 : VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+		createInfo.usage = builder.bufferUsage.translate | (builder.bufferUsage == BufferUsage.uniform ? 0 : VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 		createInfo.sharingMode = builder.sharing.translate;
 
 		VmaAllocationCreateInfo allocInfo;
-		allocInfo.usage = isUniform ? VmaMemoryUsage.VMA_MEMORY_USAGE_CPU_TO_GPU : VmaMemoryUsage.VMA_MEMORY_USAGE_GPU_ONLY;
+		allocInfo.usage = builder.memoryUsage.translate;
 		allocInfo.flags = VmaAllocationCreateFlagBits.VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
 		vkAssert(vmaCreateBuffer(device.allocator, &createInfo, &allocInfo, &buffer, &allocation, &allocationInfo),
@@ -53,6 +51,15 @@ struct VKBufferData {
 
 	void cleanup() {
 		vmaDestroyBuffer(device.allocator, buffer, allocation);
+	}
+
+	void resize(size_t newSize) {
+		builder.size = newSize;
+		if (vmaResizeAllocation(device.allocator, allocation, newSize) == VK_SUCCESS)
+			return;
+
+		cleanup();
+		create();
 	}
 
 	struct StagingBuffer {
@@ -101,13 +108,15 @@ struct VKBufferData {
 	void setData(void[] data) {
 		import std.algorithm : min;
 
-		size_t maxSize = min(allocationInfo.size, data.length);
+		if (data.length < allocationInfo.size)
+			resize(data.length);
+
 		if (allocationInfo.pMappedData) {
-			allocationInfo.pMappedData[0 .. maxSize] = data[0 .. maxSize];
+			allocationInfo.pMappedData[0 .. data.length] = data[];
 		} else {
 			StagingBuffer staging = createStaging();
 			assert(staging.allocationInfo.pMappedData);
-			staging.allocationInfo.pMappedData[0 .. maxSize] = data[0 .. maxSize];
+			staging.allocationInfo.pMappedData[0 .. data.length] = data[];
 
 			auto cb = device.beginSingleTimeCommands();
 			VkBufferCopy region;

@@ -22,7 +22,6 @@ interface IEngineState {
 import gfm.math.vector;
 
 final class TestView : IUIView, ITexture2D {
-
 	import opengl.gl4;
 
 public:
@@ -116,6 +115,7 @@ public:
 	this() {
 		_instance = this;
 		_fileSystem = new FileSystem();
+		_fileSystem.tree();
 	}
 
 	static Engine instance() {
@@ -137,8 +137,8 @@ public:
 		view.initialize(renderer);
 		renderer.initialize(view);
 
-		/*_ui = new ImguiUI(view);
-		_testView = new TestView();
+		_ui = new ImguiUI(view);
+		/*_testView = new TestView();
 		_ui.worldView = _testView;*/
 	}
 
@@ -165,8 +165,8 @@ public:
 
 			_currentState.update(delta);
 
-			if (_ui)
-				_ui.endRender();
+			/*if (_ui)
+				_ui.render();*/
 			_renderer.finalize();
 			_view.finalizeFrame();
 
